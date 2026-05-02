@@ -2,7 +2,7 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#1c69d4" />
     <meta name="description" content="BMW Quotation App - แอปคำนวณใบเสนอราคา BMW" />
     
@@ -12,6 +12,12 @@
     <meta name="apple-mobile-web-app-title" content="BMW Quote" />
     
     <title>BMW Quotation App v2.3.2</title>
+    <style>
+      /* ป้องกัน iOS zoom เวลากด input */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
