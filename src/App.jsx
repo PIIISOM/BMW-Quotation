@@ -1,7 +1,32 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Save, FolderOpen, Trash2, Settings, ChevronRight, Info, X, Check, ChevronDown, Search, Plus, Edit2, MessageSquare, RotateCcw, Download, Upload } from "lucide-react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 
-const APP_VERSION = "2.3.2";
+// ============ FIREBASE SETUP ============
+const firebaseConfig = {
+  apiKey: "AIzaSyC0tNtkaoVeQrcw2TdQhzMWC2XjOTZ6-xQ",
+  authDomain: "bmw-quotation.firebaseapp.com",
+  projectId: "bmw-quotation",
+  storageBucket: "bmw-quotation.firebasestorage.app",
+  messagingSenderId: "586555926166",
+  appId: "1:586555926166:web:31e69e812a3ba1561244b7"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const SHARED_DOC = doc(db, "shared", "data");
+
+// Helper: บันทึกขึ้น Firebase
+const saveToCloud = async (key, value) => {
+  try {
+    await setDoc(SHARED_DOC, { [key]: value }, { merge: true });
+  } catch (e) {
+    console.warn("Cloud sync failed, using local only:", e);
+  }
+};
+
+const APP_VERSION = "2.4.0";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
@@ -1033,6 +1058,266 @@ function ConfirmDialog({title,message,onConfirm,onCancel}){
 }
 
 // ============ MAIN APP ============
+// ============ SUMMARY SCREEN ============
+function SummaryScreen({
+  customerName,customerPhone,salesName,carModel,mode,result,inputs,discount,
+  selectedFreebies,freebieItems,freebieOther,
+  redPlateDeposit,setRedPlateDeposit,regFee,setRegFee,depositPaid,setDepositPaid,
+  onClose,showToast
+}){
+  const today=new Date().toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"});
+  const modeLabel=MODES[mode]?.label||mode;
+  const modeSub=MODES[mode]?.sublabel||"";
+  const fmt=n=>Number(n||0).toLocaleString("th-TH");
+
+  // คำนวณค่าใช้จ่ายวันรับรถ
+  const totalExpense=(result.downAmt||0)+(redPlateDeposit||0)+(regFee||0);
+  const totalDeduct=(discount||0)+(depositPaid||0);
+  const remaining=totalExpense-totalDeduct;
+
+  // ของแถมที่เลือก
+  const chosenFreebies=freebieItems.filter(f=>selectedFreebies.includes(f.id));
+
+  // LINE Message
+  const buildLine=()=>{
+    const lines=[];
+    lines.push(`📋 สรุปใบเสนอราคา BMW`);
+    lines.push(`วันที่: ${today}`);
+    lines.push(`━━━━━━━━━━━━━━━`);
+    lines.push(`👤 ข้อมูลลูกค้า`);
+    lines.push(`ชื่อ: ${customerName||"-"}`);
+    lines.push(`เบอร์: ${customerPhone||"-"}`);
+    lines.push(`Sales: ${salesName||"-"}`);
+    lines.push(`━━━━━━━━━━━━━━━`);
+    lines.push(`🚗 รายละเอียดรถ`);
+    lines.push(`รุ่น: ${carModel||"-"}`);
+    lines.push(`โหมด: ${modeLabel} ${modeSub}`);
+    lines.push(`ราคา: ${fmt(result.carPrice)} บาท`);
+    lines.push(`━━━━━━━━━━━━━━━`);
+    lines.push(`💰 การผ่อนชำระ`);
+    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท (${inputs.downPercent||0}%)`);
+    lines.push(`ยอดจัด: ${fmt(result.finance)} บาท`);
+    lines.push(`ค่างวด: ${fmt(result.monthly)} บาท/เดือน`);
+    lines.push(`จำนวนงวด: ${inputs.term||0} เดือน`);
+    if(chosenFreebies.length>0||freebieOther){
+      lines.push(`━━━━━━━━━━━━━━━`);
+      lines.push(`🎁 ของแถม`);
+      chosenFreebies.forEach(f=>lines.push(`✓ ${f.name}${f.detail?` (${f.detail})`:""}`));
+      if(freebieOther)lines.push(`✓ ${freebieOther}`);
+    }
+    lines.push(`━━━━━━━━━━━━━━━`);
+    lines.push(`🧾 ค่าใช้จ่ายวันรับรถ`);
+    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท`);
+    lines.push(`ค่ามัดจำป้ายแดง: ${fmt(redPlateDeposit)} บาท`);
+    if(regFee>0)lines.push(`ค่าจดทะเบียน: ${fmt(regFee)} บาท`);
+    lines.push(`รวม: ${fmt(totalExpense)} บาท`);
+    if(discount>0)lines.push(`หักส่วนลด: -${fmt(discount)} บาท`);
+    if(depositPaid>0)lines.push(`หักเงินจอง: -${fmt(depositPaid)} บาท`);
+    lines.push(`คงเหลือ: ${fmt(remaining)} บาท`);
+    return lines.join("\n");
+  };
+
+  const copyLine=()=>{
+    navigator.clipboard.writeText(buildLine())
+      .then(()=>showToast("Copy LINE แล้ว ✓"))
+      .catch(()=>showToast("Copy ไม่สำเร็จ"));
+  };
+
+  return(
+    <div className="fixed inset-0 z-50 bg-neutral-100 overflow-y-auto">
+      {/* Header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-white px-4 py-3 shadow-sm">
+        <button onClick={onClose} className="flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900">
+          <ChevronRight size={18} className="rotate-180"/>
+          <span>กลับ</span>
+        </button>
+        <h2 className="text-sm font-bold text-neutral-900">📋 สรุปใบเสนอราคา</h2>
+        <div className="text-xs text-neutral-400">{today}</div>
+      </div>
+
+      <div className="mx-auto max-w-md space-y-3 p-4 pb-8">
+
+        {/* ข้อมูลลูกค้า */}
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[#1c69d4]">👤 ข้อมูลลูกค้า</div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-neutral-500">ชื่อลูกค้า</span>
+              <span className="font-medium text-neutral-900">{customerName||"-"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">เบอร์โทร</span>
+              <span className="font-medium text-neutral-900">{customerPhone||"-"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">พนักงานขาย</span>
+              <span className="font-medium text-neutral-900">{salesName||"-"}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* รายละเอียดรถและการผ่อน */}
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[#1c69d4]">🚗 รายละเอียดรถและการผ่อน</div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-neutral-500">รุ่นรถ</span>
+              <span className="font-medium text-neutral-900 text-right max-w-[60%]">{carModel||"-"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">โหมด</span>
+              <span className="font-medium text-neutral-900">{modeLabel} {modeSub}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">ราคารถ</span>
+              <span className="font-medium tabular-nums">{fmt(result.carPrice)} บาท</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">เงินดาวน์</span>
+              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท ({inputs.downPercent||0}%)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">ยอดจัดไฟแนนซ์</span>
+              <span className="font-medium tabular-nums">{fmt(result.finance)} บาท</span>
+            </div>
+            <div className="h-px bg-neutral-100 my-1"/>
+            <div className="flex justify-between items-center">
+              <span className="text-neutral-500">ค่างวด/เดือน</span>
+              <span className="text-base font-bold text-[#1c69d4] tabular-nums">{fmt(result.monthly)} บาท</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-500">จำนวนงวด</span>
+              <span className="font-medium">{inputs.term||0} เดือน</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ของแถม */}
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[#1c69d4]">🎁 ของแถมที่ได้รับ</div>
+          {chosenFreebies.length===0&&!freebieOther?(
+            <div className="text-sm text-neutral-400 text-center py-2">ไม่มีของแถม</div>
+          ):(
+            <div className="space-y-2">
+              {chosenFreebies.map(f=>(
+                <div key={f.id} className="flex items-start gap-2 text-sm">
+                  <span className="mt-0.5 text-green-500 flex-shrink-0">✓</span>
+                  <div>
+                    <div className="font-medium text-neutral-900">{f.name}</div>
+                    {f.detail&&<div className="text-[11px] text-neutral-500">{f.detail}</div>}
+                  </div>
+                </div>
+              ))}
+              {freebieOther&&(
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="mt-0.5 text-green-500 flex-shrink-0">✓</span>
+                  <div className="font-medium text-neutral-900">{freebieOther}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ค่าใช้จ่ายวันรับรถ */}
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[#1c69d4]">🧾 ค่าใช้จ่ายวันรับรถ</div>
+          <div className="space-y-2.5">
+
+            {/* เงินดาวน์ (อ่านอย่างเดียว) */}
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-neutral-500">เงินดาวน์</span>
+              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท</span>
+            </div>
+
+            {/* ค่ามัดจำป้ายแดง */}
+            <div className="flex justify-between items-center gap-3 text-sm">
+              <span className="text-neutral-500 flex-shrink-0">ค่ามัดจำป้ายแดง</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={redPlateDeposit}
+                  onChange={e=>setRedPlateDeposit(Number(e.target.value))}
+                  className="w-28 rounded-lg border border-neutral-200 px-2 py-1 text-right text-sm font-medium outline-none focus:border-[#1c69d4] tabular-nums"
+                />
+                <span className="text-neutral-500 text-xs">บาท</span>
+              </div>
+            </div>
+
+            {/* ค่าจดทะเบียน */}
+            <div className="flex justify-between items-center gap-3 text-sm">
+              <span className="text-neutral-500 flex-shrink-0">ค่าจดทะเบียน</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={regFee}
+                  onChange={e=>setRegFee(Number(e.target.value))}
+                  className="w-28 rounded-lg border border-neutral-200 px-2 py-1 text-right text-sm font-medium outline-none focus:border-[#1c69d4] tabular-nums"
+                  placeholder="0"
+                />
+                <span className="text-neutral-500 text-xs">บาท</span>
+              </div>
+            </div>
+
+            {/* เส้นคั่น */}
+            <div className="h-px bg-neutral-100"/>
+
+            {/* รวม */}
+            <div className="flex justify-between items-center text-sm font-semibold">
+              <span>รวม</span>
+              <span className="tabular-nums">{fmt(totalExpense)} บาท</span>
+            </div>
+
+            {/* หักส่วนลด (แสดงถ้ามี) */}
+            {discount>0&&(
+              <div className="flex justify-between items-center text-sm text-red-500">
+                <span>หักส่วนลด</span>
+                <span className="tabular-nums">-{fmt(discount)} บาท</span>
+              </div>
+            )}
+
+            {/* หักเงินจอง */}
+            <div className="flex justify-between items-center gap-3 text-sm">
+              <span className="text-neutral-500 flex-shrink-0">หักเงินจอง</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={depositPaid}
+                  onChange={e=>setDepositPaid(Number(e.target.value))}
+                  className="w-28 rounded-lg border border-neutral-200 px-2 py-1 text-right text-sm font-medium outline-none focus:border-[#1c69d4] tabular-nums"
+                  placeholder="0"
+                />
+                <span className="text-neutral-500 text-xs">บาท</span>
+              </div>
+            </div>
+
+            {/* เส้นคั่นคงเหลือ */}
+            <div className="h-px bg-neutral-200"/>
+
+            {/* คงเหลือ */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-bold text-neutral-900">คงเหลือชำระวันรับรถ</span>
+              <span className={`text-base font-bold tabular-nums ${remaining<0?"text-red-500":"text-[#1c69d4]"}`}>
+                {fmt(remaining)} บาท
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ปุ่ม Copy LINE */}
+        <button
+          onClick={copyLine}
+          className="w-full rounded-xl bg-[#06c755] py-3.5 text-sm font-bold text-white shadow-sm active:bg-[#05a847] flex items-center justify-center gap-2"
+        >
+          <MessageSquare size={18}/>
+          Copy LINE Message
+        </button>
+
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const[carDB,setCarDB]=useState([]);
   const[mode,setMode]=useState("HP");
@@ -1064,72 +1349,104 @@ export default function App(){
   const[selectedFreebies,setSelectedFreebies]=useState([]);
   const[freebieOther,setFreebieOther]=useState("");
   const[showFreebieManager,setShowFreebieManager]=useState(false);
+
+  // Summary Screen State
+  const[showSummary,setShowSummary]=useState(false);
+  const[redPlateDeposit,setRedPlateDeposit]=useState(10000);
+  const[regFee,setRegFee]=useState(0);
+  const[depositPaid,setDepositPaid]=useState(0);
   
-  // Load car DB + Sales Name + Promotions + Freebies
+  // Load + Firebase Realtime Sync
   useEffect(()=>{
-    try{
-      const saved=localStorage.getItem("carDB");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCarDB(parsed);
-        } else {
-          setCarDB(DEFAULT_CAR_DB);
-        }
-      } else {
-        setCarDB(DEFAULT_CAR_DB);
-      }
-      
-      const savedSales=localStorage.getItem("salesName");
-      if(savedSales)setSalesName(savedSales);
-      
-      // Load Promotions with validation
-      const savedPromos=localStorage.getItem("promotions");
-      if(savedPromos){
-        try{
-          const parsed=JSON.parse(savedPromos);
-          
-          // Validate structure
-          if(parsed&&typeof parsed==="object"&&parsed.promotions){
-            setPromotions(parsed.promotions);
-            setCurrentPromoId(parsed.currentPromo||"");
-          }else{
-            console.warn("Invalid promotion data structure, creating new");
+    // โหลด salesName จาก localStorage ก่อน (ไม่ sync ข้ามเครื่อง)
+    const savedSales=localStorage.getItem("salesName");
+    if(savedSales) setSalesName(savedSales);
+    loadSavedList();
+
+    // ฟัง Firebase realtime - sync carDB, promotions, freebies ข้ามเครื่อง
+    const unsub = onSnapshot(SHARED_DOC, (snap) => {
+      try {
+        if(snap.exists()){
+          const data = snap.data();
+
+          // carDB
+          if(data.carDB && Array.isArray(data.carDB) && data.carDB.length > 0){
+            setCarDB(data.carDB);
+            localStorage.setItem("carDB", JSON.stringify(data.carDB));
+          } else {
+            setCarDB(DEFAULT_CAR_DB);
+          }
+
+          // promotions
+          if(data.promotions && data.promotions.promotions){
+            setPromotions(data.promotions.promotions);
+            setCurrentPromoId(data.promotions.currentPromo||"");
+            localStorage.setItem("promotions", JSON.stringify(data.promotions));
+          } else {
             initializeDefaultPromotion();
           }
-        }catch(parseErr){
-          console.error("Failed to parse promotions:",parseErr);
-          alert("⚠️ ข้อมูลโปรโมชั่นเสียหาย\nระบบจะสร้างข้อมูลใหม่");
-          initializeDefaultPromotion();
-        }
-      }else{
-        // ถ้ายังไม่มี → สร้าง default
-        initializeDefaultPromotion();
-      }
-      
-      // Load Freebies
-      const savedFreebies=localStorage.getItem("freebieItems");
-      if(savedFreebies){
-        try{
-          const parsed=JSON.parse(savedFreebies);
-          if(Array.isArray(parsed)&&parsed.length>0){
-            setFreebieItems(parsed);
-          }else{
+
+          // freebies
+          if(data.freebieItems && Array.isArray(data.freebieItems) && data.freebieItems.length > 0){
+            setFreebieItems(data.freebieItems);
+            localStorage.setItem("freebieItems", JSON.stringify(data.freebieItems));
+          } else {
             setFreebieItems(DEFAULT_FREEBIES);
           }
-        }catch{
-          setFreebieItems(DEFAULT_FREEBIES);
+
+        } else {
+          // Firebase ว่าง → ใช้ข้อมูล local หรือ default แล้ว upload ขึ้น
+          const localCarDB = JSON.parse(localStorage.getItem("carDB")||"null");
+          const localPromos = JSON.parse(localStorage.getItem("promotions")||"null");
+          const localFreebies = JSON.parse(localStorage.getItem("freebieItems")||"null");
+
+          const carDBToUse = (localCarDB && localCarDB.length > 0) ? localCarDB : DEFAULT_CAR_DB;
+          const freebiestoUse = (localFreebies && localFreebies.length > 0) ? localFreebies : DEFAULT_FREEBIES;
+
+          setCarDB(carDBToUse);
+          setFreebieItems(freebiestoUse);
+
+          if(localPromos && localPromos.promotions){
+            setPromotions(localPromos.promotions);
+            setCurrentPromoId(localPromos.currentPromo||"");
+          } else {
+            initializeDefaultPromotion();
+          }
+
+          // Upload ข้อมูล local ขึ้น Firebase
+          saveToCloud("carDB", carDBToUse);
+          saveToCloud("freebieItems", freebiestoUse);
+          if(localPromos) saveToCloud("promotions", localPromos);
         }
-      }else{
-        setFreebieItems(DEFAULT_FREEBIES);
+      } catch(err){
+        console.error("Firebase sync error:", err);
+        // Fallback to localStorage
+        try {
+          const saved=localStorage.getItem("carDB");
+          if(saved){ const p=JSON.parse(saved); if(p?.length>0) setCarDB(p); else setCarDB(DEFAULT_CAR_DB); }
+          else setCarDB(DEFAULT_CAR_DB);
+          const savedPromos=localStorage.getItem("promotions");
+          if(savedPromos){ const p=JSON.parse(savedPromos); if(p?.promotions){ setPromotions(p.promotions); setCurrentPromoId(p.currentPromo||""); } else initializeDefaultPromotion(); }
+          else initializeDefaultPromotion();
+          const savedFreebies=localStorage.getItem("freebieItems");
+          if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); }
+          else setFreebieItems(DEFAULT_FREEBIES);
+        } catch { setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
       }
-    }catch(err){
-      console.error("Error loading from localStorage:", err);
-      setCarDB(DEFAULT_CAR_DB);
-      initializeDefaultPromotion();
-      setFreebieItems(DEFAULT_FREEBIES);
-    }
-    loadSavedList();
+    }, (err) => {
+      console.warn("Firebase offline, using local data:", err);
+      // Offline fallback
+      try {
+        const saved=localStorage.getItem("carDB");
+        if(saved){ const p=JSON.parse(saved); if(p?.length>0) setCarDB(p); else setCarDB(DEFAULT_CAR_DB); } else setCarDB(DEFAULT_CAR_DB);
+        const savedPromos=localStorage.getItem("promotions");
+        if(savedPromos){ const p=JSON.parse(savedPromos); if(p?.promotions){ setPromotions(p.promotions); setCurrentPromoId(p.currentPromo||""); } else initializeDefaultPromotion(); } else initializeDefaultPromotion();
+        const savedFreebies=localStorage.getItem("freebieItems");
+        if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); } else setFreebieItems(DEFAULT_FREEBIES);
+      } catch { setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
+    });
+
+    return () => unsub(); // cleanup listener
   },[]);
   
   const initializeDefaultPromotion=()=>{
@@ -1154,7 +1471,12 @@ export default function App(){
   };
   
   const saveCarDB=cars=>{
-    try{ localStorage.setItem("carDB",JSON.stringify(cars)); setCarDB(cars); showToast("บันทึกรถแล้ว ✓"); }
+    try{
+      localStorage.setItem("carDB",JSON.stringify(cars));
+      setCarDB(cars);
+      saveToCloud("carDB", cars);
+      showToast("บันทึกรถแล้ว ✓");
+    }
     catch{ showToast("บันทึกไม่สำเร็จ"); }
   };
   
@@ -1166,16 +1488,14 @@ export default function App(){
   const savePromotions=data=>{
     try{
       const json=JSON.stringify(data);
-      
-      // เช็คขนาดข้อมูล (ไม่ควรเกิน 1MB)
       if(json.length>1000000){
         alert("⚠️ ข้อมูลโปรโมชั่นใหญ่เกินไป\nแนะนำให้ลบโปรโมชั่นเก่าที่ไม่ใช้แล้ว");
         return;
       }
-      
       localStorage.setItem("promotions",json);
       setPromotions(data.promotions);
       setCurrentPromoId(data.currentPromo);
+      saveToCloud("promotions", data);
       showToast("บันทึกโปรโมชั่นแล้ว ✓");
     }catch(err){
       console.error("Save promotion error:",err);
@@ -1262,6 +1582,7 @@ export default function App(){
     try{
       localStorage.setItem("freebieItems",JSON.stringify(items));
       setFreebieItems(items);
+      saveToCloud("freebieItems", items);
       showToast("บันทึกของแถมแล้ว ✓");
     }catch(err){
       console.error("Save freebies error:",err);
@@ -1756,6 +2077,16 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           </div>
         )}
         
+        {/* SUMMARY BUTTON */}
+        {result.monthly>0&&(
+          <button
+            onClick={()=>setShowSummary(true)}
+            className="w-full rounded-xl bg-[#1c69d4] py-3.5 text-sm font-bold text-white shadow-sm active:bg-[#1557b0]"
+          >
+            📋 ดูสรุปใบเสนอราคา
+          </button>
+        )}
+
         {/* Footer Version */}
         <div className="flex items-center justify-between text-[10px] text-neutral-400 pt-2">
           <span>Validity: {validityStr}</span>
@@ -1804,6 +2135,31 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
       {/* FREEBIE MANAGER */}
       {showFreebieManager&&<FreebieManager items={freebieItems} onSave={saveFreebies} onClose={()=>{setShowFreebieManager(false);setShowSettings(false);}} onBack={()=>setShowFreebieManager(false)}/>}
       
+      {/* SUMMARY SCREEN */}
+      {showSummary&&(
+        <SummaryScreen
+          customerName={customerName}
+          customerPhone={customerPhone}
+          salesName={salesName}
+          carModel={carModel}
+          mode={mode}
+          result={result}
+          inputs={inputs}
+          discount={discount}
+          selectedFreebies={selectedFreebies}
+          freebieItems={freebieItems}
+          freebieOther={freebieOther}
+          redPlateDeposit={redPlateDeposit}
+          setRedPlateDeposit={setRedPlateDeposit}
+          regFee={regFee}
+          setRegFee={setRegFee}
+          depositPaid={depositPaid}
+          setDepositPaid={setDepositPaid}
+          onClose={()=>setShowSummary(false)}
+          showToast={showToast}
+        />
+      )}
+
       {/* RESET CONFIRM */}
       {showResetConfirm&&(
         <ConfirmDialog 
