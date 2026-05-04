@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Save, FolderOpen, Trash2, Settings, ChevronRight, Info, X, Check, ChevronDown, Search, Plus, Edit2, MessageSquare, RotateCcw, Download, Upload } from "lucide-react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
 
 // ============ FIREBASE SETUP ============
 const firebaseConfig = {
