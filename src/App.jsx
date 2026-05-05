@@ -946,7 +946,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
           <div className="border-t border-neutral-200 pt-4">
             <label className="text-sm font-medium text-neutral-700 mb-2 block">จัดการข้อมูล</label>
             
-            <button onClick={()=>{onClose(); onOpenCarManager();}} 
+            <button onClick={()=>{onOpenCarManager();}}
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-neutral-100 p-2">
@@ -960,7 +960,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
             
-            <button onClick={()=>{onClose(); onOpenPromoManager();}} 
+            <button onClick={()=>{onOpenPromoManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-amber-100 p-2">
@@ -974,7 +974,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
             
-            <button onClick={()=>{onClose(); onOpenFreebieManager();}} 
+            <button onClick={()=>{onOpenFreebieManager();}}
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-green-100 p-2">
