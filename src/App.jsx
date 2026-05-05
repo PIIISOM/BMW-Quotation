@@ -1751,9 +1751,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
       <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#0066b3] via-white to-[#e22718] ring-1 ring-neutral-200">
-              <span className="text-[10px] font-black text-neutral-800">BMW</span>
-            </div>
+            <img src="/logo-big.png" alt="BMW Logo" className="h-8 w-8 object-contain" />
             <div>
               <div className="text-[14px] font-bold leading-tight text-neutral-900">Quotation</div>
               <div className="text-[10px] text-neutral-500 leading-tight">v{APP_VERSION}</div>
