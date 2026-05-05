@@ -1095,7 +1095,7 @@ function SummaryScreen({
     lines.push(`ราคา: ${fmt(result.carPrice)} บาท`);
     lines.push(`━━━━━━━━━━━━━━━`);
     lines.push(`💰 การผ่อนชำระ`);
-    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท (${inputs.downPercent||0}%)`);
+    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท (${MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)`);
     lines.push(`ยอดจัด: ${fmt(result.finance)} บาท`);
     lines.push(`ค่างวด: ${fmt(result.monthly)} บาท/เดือน`);
     lines.push(`จำนวนงวด: ${inputs.term||0} เดือน`);
@@ -1174,7 +1174,7 @@ function SummaryScreen({
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500">เงินดาวน์</span>
-              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท ({inputs.downPercent||0}%)</span>
+              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท ({MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)</span>
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500">ยอดจัดไฟแนนซ์</span>
