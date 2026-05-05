@@ -1,7 +1,3 @@
-# BMW Quotation App - Environment Variables
-# ⚠️ ไฟล์นี้ต้องไม่ commit ขึ้น GitHub!
-
-# Firebase Configuration
 VITE_FIREBASE_API_KEY=AIzaSyC0tNtkaoVeQrcw2TdQhzMWC2XjOTZ6-xQ
 VITE_FIREBASE_AUTH_DOMAIN=bmw-quotation.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=bmw-quotation
