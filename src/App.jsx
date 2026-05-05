@@ -1317,6 +1317,62 @@ function SummaryScreen({
     </div>
   );
 }
+function DownTableScreen({carModel,mode,inputs,discount,onClose}){
+  const DOWN_PCTS=[20,25,30,35];
+  const allModeRows=Object.keys(MODES).map(m=>{
+    const modeInfo=MODES[m];
+    const key=modeInfo.hasDeposit?'depositPct':'downPct';
+    return{
+      mode:m,
+      data:DOWN_PCTS.map(pct=>{
+        const newInputs={...inputs,[key]:pct};
+        const r=calculate(m,newInputs,discount||0);
+        return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly};
+      }),
+    };
+  });
+  return(
+    <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
+      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3">
+        <button onClick={onClose} className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100 text-lg">←</button>
+        <div>
+          <div className="text-sm font-bold text-neutral-900">ตารางเปรียบเทียบยอดผ่อน</div>
+          <div className="text-xs text-neutral-500">{carModel||'ยังไม่เลือกรถ'}</div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-md p-4 space-y-4">
+        {allModeRows.map(({mode:m,data})=>(
+          <div key={m} className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+            <div className="bg-[#1c69d4] px-4 py-2.5">
+              <span className="text-sm font-bold text-white">{m} — {MODES[m].thaiName}</span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-100 bg-neutral-50">
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(({pct,downAmt,monthly},idx)=>(
+                  <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
+                    <td className="px-4 py-3 font-semibold text-neutral-700">{pct}%</td>
+                    <td className="px-4 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        <p className="text-center text-xs text-neutral-400 pb-4">
+          คำนวณจากระยะเวลา {inputs.term||60} เดือน | อัตราดอกเบี้ยตามโปรโมชั่นปัจจุบัน
+        </p>
+      </main>
+    </div>
+  );
+}
 
 export default function App(){
   const[carDB,setCarDB]=useState([]);
@@ -1352,6 +1408,7 @@ export default function App(){
 
   // Summary Screen State
   const[showSummary,setShowSummary]=useState(false);
+  const[showDownTable,setShowDownTable]=useState(false);
   const[redPlateDeposit,setRedPlateDeposit]=useState(10000);
   const[regFee,setRegFee]=useState(0);
   const[depositPaid,setDepositPaid]=useState(0);
@@ -2079,12 +2136,20 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
         
         {/* SUMMARY BUTTON */}
         {result.monthly>0&&(
-          <button
-            onClick={()=>setShowSummary(true)}
-            className="w-full rounded-xl bg-[#1c69d4] py-3.5 text-sm font-bold text-white shadow-sm active:bg-[#1557b0]"
-          >
-            📋 ดูสรุปใบเสนอราคา
-          </button>
+          <>
+            <button
+              onClick={()=>setShowSummary(true)}
+              className="w-full rounded-xl bg-[#1c69d4] py-3.5 text-sm font-bold text-white shadow-sm active:bg-[#1557b0]"
+            >
+              📋 ดูสรุปใบเสนอราคา
+            </button>
+            <button
+              onClick={()=>setShowDownTable(true)}
+              className="w-full rounded-xl border border-[#1c69d4] py-3.5 text-sm font-bold text-[#1c69d4] active:bg-blue-50"
+            >
+              📊 ตารางเปรียบเทียบดาวน์
+            </button>
+          </>
         )}
 
         {/* Footer Version */}
@@ -2159,7 +2224,15 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           showToast={showToast}
         />
       )}
-
+    {showDownTable&&(
+        <DownTableScreen
+          carModel={carModel}
+          mode={mode}
+          inputs={inputs}
+          discount={discount}
+          onClose={()=>setShowDownTable(false)}
+        />
+      )}
       {/* RESET CONFIRM */}
       {showResetConfirm&&(
         <ConfirmDialog 
