@@ -5,12 +5,12 @@ import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
 
 // ============ FIREBASE SETUP ============
 const firebaseConfig = {
-  apiKey: "AIzaSyC0tNtkaoVeQrcw2TdQhzMWC2XjOTZ6-xQ",
-  authDomain: "bmw-quotation.firebaseapp.com",
-  projectId: "bmw-quotation",
-  storageBucket: "bmw-quotation.firebasestorage.app",
-  messagingSenderId: "586555926166",
-  appId: "1:586555926166:web:31e69e812a3ba1561244b7"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
