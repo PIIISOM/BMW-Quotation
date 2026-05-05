@@ -1317,20 +1317,21 @@ function SummaryScreen({
     </div>
   );
 }
+
 function DownTableScreen({carModel,mode,inputs,discount,onClose}){
   const DOWN_PCTS=[20,25,30,35];
-  const allModeRows=Object.keys(MODES).map(m=>{
-    const modeInfo=MODES[m];
-    const key=modeInfo.hasDeposit?'depositPct':'downPct';
-    return{
-      mode:m,
-      data:DOWN_PCTS.map(pct=>{
-        const newInputs={...inputs,[key]:pct};
-        const r=calculate(m,newInputs,discount||0);
-        return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly};
-      }),
-    };
+  const [selectedTerm,setSelectedTerm]=useState(Number(inputs.term)||60);
+  const TERMS=[48,60,72];
+
+  const modeInfo=MODES[mode];
+  const key=modeInfo.hasDeposit?'depositPct':'downPct';
+
+  const data=DOWN_PCTS.map(pct=>{
+    const newInputs={...inputs,[key]:pct,term:selectedTerm};
+    const r=calculate(mode,newInputs,discount||0);
+    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly};
   });
+
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3">
@@ -1341,33 +1342,57 @@ function DownTableScreen({carModel,mode,inputs,discount,onClose}){
         </div>
       </header>
       <main className="mx-auto max-w-md p-4 space-y-4">
-        {allModeRows.map(({mode:m,data})=>(
-          <div key={m} className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
-            <div className="bg-[#1c69d4] px-4 py-2.5">
-              <span className="text-sm font-bold text-white">{m} — {MODES[m].thaiName}</span>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-100 bg-neutral-50">
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map(({pct,downAmt,monthly},idx)=>(
-                  <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
-                    <td className="px-4 py-3 font-semibold text-neutral-700">{pct}%</td>
-                    <td className="px-4 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+        {/* Mode Badge */}
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-[#1c69d4] px-3 py-1 text-xs font-bold text-white">{mode}</span>
+          <span className="text-xs text-neutral-500">{modeInfo.thaiName}</span>
+        </div>
+
+        {/* Term Selector */}
+        <div className="rounded-xl border border-neutral-200 bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-neutral-500">ระยะเวลาผ่อน</p>
+          <div className="flex gap-2">
+            {TERMS.map(t=>(
+              <button
+                key={t}
+                onClick={()=>setSelectedTerm(t)}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                  selectedTerm===t
+                    ?'bg-[#1c69d4] text-white'
+                    :'border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                }`}
+              >
+                {t} เดือน
+              </button>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {/* Table */}
+        <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-100 bg-neutral-50">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(({pct,downAmt,monthly},idx)=>(
+                <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
+                  <td className="px-4 py-3 font-semibold text-neutral-700">{pct}%</td>
+                  <td className="px-4 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         <p className="text-center text-xs text-neutral-400 pb-4">
-          คำนวณจากระยะเวลา {inputs.term||60} เดือน | อัตราดอกเบี้ยตามโปรโมชั่นปัจจุบัน
+          คำนวณจากระยะเวลา {selectedTerm} เดือน | อัตราดอกเบี้ยตามโปรโมชั่นปัจจุบัน
         </p>
       </main>
     </div>
