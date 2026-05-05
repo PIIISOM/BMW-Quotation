@@ -1694,8 +1694,9 @@ const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setTo
   };
   
   const deleteQuote=key=>{
-    try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
-  };
+  if(!confirm("ต้องการลบ Quote นี้ใช่ไหม?"))return;
+  try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
+};
   
   const copyTextQuote=()=>{
     const actualPrice=result.carPrice + (Number(discount)||0);
