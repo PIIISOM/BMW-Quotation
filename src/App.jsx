@@ -1779,7 +1779,8 @@ const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setTo
   if(!confirm("ต้องการลบ Quote นี้ใช่ไหม?"))return;
   try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
 };
-  
+
+  const validityDate=new Date(); validityDate.setDate
   const copyTextQuote=()=>{
     const actualPrice=result.carPrice + (Number(discount)||0);
     
@@ -1824,7 +1825,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
     navigator.clipboard.writeText(txt).then(()=>showToast("คัดลอกข้อความแล้ว ✓")).catch(()=>showToast("คัดลอกไม่ได้"));
   };
   
-  const validityDate=new Date(); validityDate.setDate(validityDate.getDate()+3);
+  (validityDate.getDate()+3);
   const validityStr=validityDate.toLocaleDateString("th-TH",{year:"numeric",month:"short",day:"numeric"});
   
   return(
@@ -1971,7 +1972,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                 {[12,24,36,48,60,72,84].map(t=><option key={t} value={t}>{t} เดือน</option>)}
               </select>
             </div>
-            <NumberInput label="ส่วนลด" value={discount} onChange={v=>setDiscount(v)} suffix="บาท"/>
+            <NumberInput label="ส่วนลด" value={discount} onChange={v=>setDiscount(Number(v)||0)} suffix="บาท"/>
           </div>
           <button onClick={()=>setShowAdvanced(!showAdvanced)}
             className="flex w-full items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-100">
