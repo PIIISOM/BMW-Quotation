@@ -1931,13 +1931,13 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
               <>
                 <NumberInput label="Deposit" value={inputs.depositPct} onChange={v=>setField("depositPct",v)} suffix="%"/>
                 <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Deposit Amt.</label>
-                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700">{fmtB(result.depositAmt)}</div></div>
-              </>
+                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.depositAmt)}</div>
+                </>
             ):(
               <>
                 <NumberInput label="Down Payment" value={inputs.downPct} onChange={v=>setField("downPct",v)} suffix="%"/>
-                <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Down Amt.</label>
-                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700">{fmtB(result.downAmt)}</div></div>
+                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.downAmt)}</div>
+                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700">{fmtB(result.downAmt)}</div></div>
               </>
             )}
           </div>
@@ -1945,8 +1945,8 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
             <div className="grid grid-cols-2 gap-3">
               <NumberInput label="Balloon" value={inputs.balloonPct} onChange={v=>setField("balloonPct",v)} suffix="%"/>
               <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Balloon Amt.</label>
-                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700">{fmtB(result.balloonAmt)}</div></div>
-            </div>
+              <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.balloonAmt)}</div>
+              </div>
           )}
           {m.hasGFV&&(
             <div className="rounded-lg border border-[#1c69d4]/30 bg-[#1c69d4]/[0.04] p-3 space-y-2">
