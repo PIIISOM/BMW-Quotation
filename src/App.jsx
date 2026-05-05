@@ -18,7 +18,7 @@ const db = getFirestore(firebaseApp);
 const SHARED_DOC = doc(db, "shared", "data");
 
 // Helper: บันทึกขึ้น Firebase
-const saveToCloud = async (key, value) => {
+const saveToCloud = async (key, value) => {    
   try {
     await setDoc(SHARED_DOC, { [key]: value }, { merge: true });
   } catch (e) {
@@ -1660,8 +1660,9 @@ export default function App(){
     setAutoFilledRate(null); // ✅ เคลียร์ auto-fill badge
     showToast("รีเซ็ตข้อมูลแล้ว ✓");
   };
-  
-  const showToast=msg=>{ setToast(msg); setTimeout(()=>setToast(""),2500); };
+
+  const toastRef=useRef(null);
+const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setToast(msg); toastRef.current=setTimeout(()=>setToast(""),2500); };
   
   const loadSavedList=()=>{
     try{
