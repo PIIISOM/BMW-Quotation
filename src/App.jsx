@@ -18,7 +18,7 @@ const db = getFirestore(firebaseApp);
 const SHARED_DOC = doc(db, "shared", "data");
 
 // Helper: บันทึกขึ้น Firebase
-const saveToCloud = async (key, value) => {    
+const saveToCloud = async (key, value) => {
   try {
     await setDoc(SHARED_DOC, { [key]: value }, { merge: true });
   } catch (e) {
@@ -946,7 +946,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
           <div className="border-t border-neutral-200 pt-4">
             <label className="text-sm font-medium text-neutral-700 mb-2 block">จัดการข้อมูล</label>
             
-            <button onClick={()=>{onOpenCarManager();}}
+            <button onClick={()=>{onOpenCarManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-neutral-100 p-2">
@@ -974,7 +974,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
             
-            <button onClick={()=>{onOpenFreebieManager();}}
+            <button onClick={()=>{onOpenFreebieManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-green-100 p-2">
@@ -1318,6 +1318,7 @@ function SummaryScreen({
   );
 }
 
+
 function DownTableScreen({carModel,mode,inputs,discount,onClose}){
   const DOWN_PCTS=[20,25,30,35];
   const [selectedTerm,setSelectedTerm]=useState(Number(inputs.term)||60);
@@ -1342,34 +1343,21 @@ function DownTableScreen({carModel,mode,inputs,discount,onClose}){
         </div>
       </header>
       <main className="mx-auto max-w-md p-4 space-y-4">
-
-        {/* Mode Badge */}
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-[#1c69d4] px-3 py-1 text-xs font-bold text-white">{mode}</span>
           <span className="text-xs text-neutral-500">{modeInfo.thaiName}</span>
         </div>
-
-        {/* Term Selector */}
         <div className="rounded-xl border border-neutral-200 bg-white p-3">
           <p className="mb-2 text-xs font-semibold text-neutral-500">ระยะเวลาผ่อน</p>
           <div className="flex gap-2">
             {TERMS.map(t=>(
-              <button
-                key={t}
-                onClick={()=>setSelectedTerm(t)}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                  selectedTerm===t
-                    ?'bg-[#1c69d4] text-white'
-                    :'border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
+              <button key={t} onClick={()=>setSelectedTerm(t)}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${selectedTerm===t?'bg-[#1c69d4] text-white':'border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}>
                 {t} เดือน
               </button>
             ))}
           </div>
         </div>
-
-        {/* Table */}
         <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -1390,7 +1378,6 @@ function DownTableScreen({carModel,mode,inputs,discount,onClose}){
             </tbody>
           </table>
         </div>
-
         <p className="text-center text-xs text-neutral-400 pb-4">
           คำนวณจากระยะเวลา {selectedTerm} เดือน | อัตราดอกเบี้ยตามโปรโมชั่นปัจจุบัน
         </p>
@@ -1742,9 +1729,9 @@ export default function App(){
     setAutoFilledRate(null); // ✅ เคลียร์ auto-fill badge
     showToast("รีเซ็ตข้อมูลแล้ว ✓");
   };
-
+  
   const toastRef=useRef(null);
-const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setToast(msg); toastRef.current=setTimeout(()=>setToast(""),2500); };
+  const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setToast(msg); toastRef.current=setTimeout(()=>setToast(""),2500); };
   
   const loadSavedList=()=>{
     try{
@@ -1776,11 +1763,14 @@ const showToast=msg=>{ if(toastRef.current)clearTimeout(toastRef.current); setTo
   };
   
   const deleteQuote=key=>{
-  if(!confirm("ต้องการลบ Quote นี้ใช่ไหม?"))return;
-  try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
-};
+    if(!confirm("ต้องการลบ Quote นี้ใช่ไหม?"))return;
+    try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
+  };
 
-  const validityDate=new Date(); validityDate.setDate
+  const validityDate=new Date();
+  validityDate.setDate(validityDate.getDate()+3);
+  const validityStr=validityDate.toLocaleDateString("th-TH",{year:"numeric",month:"short",day:"numeric"});
+  
   const copyTextQuote=()=>{
     const actualPrice=result.carPrice + (Number(discount)||0);
     
@@ -1824,9 +1814,6 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
 📅 ใช้ได้ถึง: ${validityStr}`;
     navigator.clipboard.writeText(txt).then(()=>showToast("คัดลอกข้อความแล้ว ✓")).catch(()=>showToast("คัดลอกไม่ได้"));
   };
-  
-  (validityDate.getDate()+3);
-  const validityStr=validityDate.toLocaleDateString("th-TH",{year:"numeric",month:"short",day:"numeric"});
   
   return(
     <div className="min-h-screen bg-neutral-50" style={{fontFamily:"'Inter',-apple-system,sans-serif"}}>
@@ -1931,13 +1918,13 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
               <>
                 <NumberInput label="Deposit" value={inputs.depositPct} onChange={v=>setField("depositPct",v)} suffix="%"/>
                 <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Deposit Amt.</label>
-                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.depositAmt)}</div>
-                </>
+                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.depositAmt)}</div></div>
+              </>
             ):(
               <>
                 <NumberInput label="Down Payment" value={inputs.downPct} onChange={v=>setField("downPct",v)} suffix="%"/>
-                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.downAmt)}</div>
-                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700">{fmtB(result.downAmt)}</div></div>
+                <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Down Amt.</label>
+                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.downAmt)}</div></div>
               </>
             )}
           </div>
@@ -1945,8 +1932,8 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
             <div className="grid grid-cols-2 gap-3">
               <NumberInput label="Balloon" value={inputs.balloonPct} onChange={v=>setField("balloonPct",v)} suffix="%"/>
               <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Balloon Amt.</label>
-              <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.balloonAmt)}</div>
-              </div>
+                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.balloonAmt)}</div></div>
+            </div>
           )}
           {m.hasGFV&&(
             <div className="rounded-lg border border-[#1c69d4]/30 bg-[#1c69d4]/[0.04] p-3 space-y-2">
@@ -2250,7 +2237,8 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           showToast={showToast}
         />
       )}
-    {showDownTable&&(
+
+      {showDownTable&&(
         <DownTableScreen
           carModel={carModel}
           mode={mode}
@@ -2259,6 +2247,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           onClose={()=>setShowDownTable(false)}
         />
       )}
+
       {/* RESET CONFIRM */}
       {showResetConfirm&&(
         <ConfirmDialog 
