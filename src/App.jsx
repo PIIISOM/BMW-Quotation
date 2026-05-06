@@ -754,7 +754,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
       updated[activePromo][modeKey]={
         ...updated[activePromo][modeKey],
         default:updated[activePromo][modeKey].default.map(t=>
-          t.min===downMin&&t.max===downMax&&t.term===term?{...t,rate:newRate}:t
+          t.min===downMin&&t.max===downMax&&Number(t.term)===Number(term)?{...t,rate:newRate}:t
         )
       };
       return updated;
@@ -839,7 +839,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     rows.forEach(r=>{
       const key=`${r.min}-${r.max}`;
       if(!groups[key])groups[key]={min:r.min,max:r.max,rates:{}};
-      groups[key].rates[r.term]=r.rate;
+      groups[key].rates[String(r.term)]=r.rate;
     });
     return Object.values(groups).sort((a,b)=>b.min-a.min);
   };
@@ -924,7 +924,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                             {activeTerms.map(t=>(
                               <td key={t} className="py-1 px-1 text-center">
                                 <input type="number" step="0.01" value={row.rates[t]??""} placeholder="0"
-                                  onChange={e=>updateRate(modeKey,row.min,row.max,t,e.target.value)}
+                                  onChange={e=>updateRate(modeKey,row.min,row.max,Number(t),e.target.value)}
                                   className="w-16 rounded-md border border-neutral-200 px-1 py-1 text-xs text-center font-medium text-neutral-900 focus:border-[#1c69d4] focus:outline-none"/>
                               </td>
                             ))}
