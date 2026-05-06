@@ -17,50 +17,55 @@ body {
 }
 
 /* ===== DARK MODE OVERRIDES ===== */
-.dark {
+html.dark {
   color-scheme: dark;
+  background-color: #0f0f0f;
+}
+
+html.dark body {
+  background-color: #0f0f0f;
 }
 
 /* Page background */
-.dark .min-h-screen { background-color: #0f0f0f; }
+html.dark .min-h-screen { background-color: #0f0f0f; }
 
 /* Cards, modals, panels */
-.dark .bg-white { background-color: #1a1a1a !important; }
-.dark .bg-neutral-50 { background-color: #111111 !important; }
-.dark .bg-neutral-100 { background-color: #222222 !important; }
-.dark .bg-neutral-200 { background-color: #2a2a2a !important; }
+html.dark .bg-white { background-color: #1a1a1a !important; }
+html.dark .bg-neutral-50 { background-color: #111111 !important; }
+html.dark .bg-neutral-100 { background-color: #222222 !important; }
+html.dark .bg-neutral-200 { background-color: #2a2a2a !important; }
 
 /* Text */
-.dark .text-neutral-900 { color: #f0f0f0 !important; }
-.dark .text-neutral-800 { color: #e0e0e0 !important; }
-.dark .text-neutral-700 { color: #c8c8c8 !important; }
-.dark .text-neutral-600 { color: #a0a0a0 !important; }
-.dark .text-neutral-500 { color: #808080 !important; }
-.dark .text-neutral-400 { color: #666666 !important; }
+html.dark .text-neutral-900 { color: #f0f0f0 !important; }
+html.dark .text-neutral-800 { color: #e0e0e0 !important; }
+html.dark .text-neutral-700 { color: #c8c8c8 !important; }
+html.dark .text-neutral-600 { color: #a0a0a0 !important; }
+html.dark .text-neutral-500 { color: #808080 !important; }
+html.dark .text-neutral-400 { color: #666666 !important; }
 
 /* Borders */
-.dark .border-neutral-200 { border-color: #2a2a2a !important; }
-.dark .border-neutral-100 { border-color: #222222 !important; }
-.dark .border-neutral-300 { border-color: #333333 !important; }
+html.dark .border-neutral-200 { border-color: #2a2a2a !important; }
+html.dark .border-neutral-100 { border-color: #222222 !important; }
+html.dark .border-neutral-300 { border-color: #333333 !important; }
 
 /* Inputs */
-.dark input, .dark select, .dark textarea {
+html.dark input, html.dark select, html.dark textarea {
   background-color: #1a1a1a !important;
   color: #f0f0f0 !important;
   border-color: #2a2a2a !important;
 }
-.dark input::placeholder { color: #555 !important; }
+html.dark input::placeholder { color: #555 !important; }
 
 /* Header */
-.dark header { background-color: rgba(26,26,26,0.95) !important; }
+html.dark header { background-color: rgba(26,26,26,0.95) !important; }
 
 /* Hover states */
-.dark .hover\:bg-neutral-100:hover { background-color: #2a2a2a !important; }
-.dark .hover\:bg-neutral-50:hover  { background-color: #222222 !important; }
+html.dark .hover\:bg-neutral-100:hover { background-color: #2a2a2a !important; }
+html.dark .hover\:bg-neutral-50:hover  { background-color: #222222 !important; }
 
 /* Summary / result box */
-.dark .rounded-xl { --tw-ring-color: #2a2a2a; }
+html.dark .rounded-xl { --tw-ring-color: #2a2a2a; }
 
 /* Toast */
-.dark .bg-neutral-900 { background-color: #f0f0f0 !important; }
-.dark .text-white.bg-neutral-900 { color: #111 !important; }
+html.dark .bg-neutral-900 { background-color: #f0f0f0 !important; }
+html.dark .text-white.bg-neutral-900 { color: #111 !important; }
