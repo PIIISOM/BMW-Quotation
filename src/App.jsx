@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Save, FolderOpen, Trash2, Settings, ChevronRight, Info, X, Check, ChevronDown, Search, Plus, Edit2, MessageSquare, RotateCcw, Download, Upload } from "lucide-react";
+import { Save, FolderOpen, Trash2, Settings, ChevronRight, Info, X, Check, ChevronDown, Search, Plus, Edit2, MessageSquare, RotateCcw, Download, Upload, Moon, Sun } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
 
@@ -1516,6 +1516,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,onClose})
 }
 
 export default function App(){
+  const[darkMode,setDarkMode]=useState(()=>localStorage.getItem("darkMode")==="true");
   const[carDB,setCarDB]=useState([]);
   const[mode,setMode]=useState("HP");
   const[inputs,setInputs]=useState(DEFAULT_INPUTS.HP);
@@ -1554,6 +1555,13 @@ export default function App(){
   const[regFee,setRegFee]=useState(0);
   const[depositPaid,setDepositPaid]=useState(0);
   
+  const toggleDarkMode=()=>{
+    setDarkMode(prev=>{
+      localStorage.setItem("darkMode",String(!prev));
+      return !prev;
+    });
+  };
+
   // Load + Firebase Realtime Sync
   useEffect(()=>{
     // โหลด salesName จาก localStorage ก่อน (ไม่ sync ข้ามเครื่อง)
@@ -1946,7 +1954,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
   };
   
   return(
-    <div className="min-h-screen bg-neutral-50" style={{fontFamily:"'Inter',-apple-system,sans-serif"}}>
+    <div className={`min-h-screen bg-neutral-50${darkMode?" dark":""}`} style={{fontFamily:"'Inter',-apple-system,sans-serif"}}>
       {/* HEADER */}
       <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
@@ -1958,6 +1966,9 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={toggleDarkMode} className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" title={darkMode?"โหมดสว่าง":"โหมดมืด"}>
+              {darkMode?<Sun size={18}/>:<Moon size={18}/>}
+            </button>
             <button onClick={()=>setShowSettings(true)} className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100" title="ตั้งค่า">
               <Settings size={18}/>
             </button>
