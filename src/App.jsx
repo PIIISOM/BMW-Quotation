@@ -2047,22 +2047,34 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
             {m.hasDeposit?(
               <>
                 <NumberInput label="Deposit" value={inputs.depositPct} onChange={v=>setField("depositPct",v)} suffix="%"/>
-                <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Deposit Amt.</label>
-                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.depositAmt)}</div></div>
+                <div className="space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <label className="text-[11px] font-medium tracking-wider uppercase text-neutral-500">Deposit Amt.</label>
+                  </div>
+                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center">{fmtB(result.depositAmt)}</div>
+                </div>
               </>
             ):(
               <>
                 <NumberInput label="Down Payment" value={inputs.downPct} onChange={v=>setField("downPct",v)} suffix="%"/>
-                <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Down Amt.</label>
-                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.downAmt)}</div></div>
+                <div className="space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <label className="text-[11px] font-medium tracking-wider uppercase text-neutral-500">Down Amt.</label>
+                  </div>
+                  <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center">{fmtB(result.downAmt)}</div>
+                </div>
               </>
             )}
           </div>
           {m.hasBalloon&&(
             <div className="grid grid-cols-2 gap-3">
               <NumberInput label="Balloon" value={inputs.balloonPct} onChange={v=>setField("balloonPct",v)} suffix="%"/>
-              <div className="space-y-1.5"><label className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Balloon Amt.</label>
-                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center min-h-[46px]">{fmtB(result.balloonAmt)}</div></div>
+              <div className="space-y-1.5">
+                <div className="flex items-baseline justify-between">
+                  <label className="text-[11px] font-medium tracking-wider uppercase text-neutral-500">Balloon Amt.</label>
+                </div>
+                <div className="rounded-lg bg-neutral-100 px-3 py-2.5 text-[15px] font-semibold tabular-nums text-neutral-700 flex items-center">{fmtB(result.balloonAmt)}</div>
+              </div>
             </div>
           )}
           {m.hasGFV&&(
