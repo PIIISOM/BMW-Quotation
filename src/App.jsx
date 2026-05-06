@@ -746,8 +746,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   };
 
   const updateRate=(modeKey,downMin,downMax,term,newRate)=>{
-    const rate=parseFloat(newRate);
-    if(isNaN(rate)||rate<0||rate>50){alert("❌ อัตราดอกเบี้ยต้องอยู่ระหว่าง 0-50%");return;}
+    // เก็บ string ดิบไว้ก่อน ไม่ validate ระหว่างพิมพ์
     setPromos(prev=>{
       const updated={...prev};
       if(!updated[activePromo])updated[activePromo]={...DEFAULT_PROMOTION};
@@ -755,7 +754,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
       updated[activePromo][modeKey]={
         ...updated[activePromo][modeKey],
         default:updated[activePromo][modeKey].default.map(t=>
-          t.min===downMin&&t.max===downMax&&t.term===term?{...t,rate}:t
+          t.min===downMin&&t.max===downMax&&t.term===term?{...t,rate:newRate}:t
         )
       };
       return updated;
@@ -818,7 +817,21 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     });
   };
 
-  const save=()=>{onSave({currentPromo:activePromo,promotions:promos});if(onBack)onBack();else onClose();};
+  const save=()=>{
+    // validate rate ทั้งหมดก่อน save
+    for(const modeKey of ["HP","HP-BL","FC","FL","FL-BL"]){
+      const rows=promos[activePromo]?.[modeKey]?.default||[];
+      for(const row of rows){
+        const r=parseFloat(row.rate);
+        if(isNaN(r)||r<0||r>50){
+          alert(`❌ อัตราดอกเบี้ยไม่ถูกต้องใน ${modeKey}\nต้องอยู่ระหว่าง 0-50%`);
+          return;
+        }
+      }
+    }
+    onSave({currentPromo:activePromo,promotions:promos});
+    if(onBack)onBack();else onClose();
+  };
 
   const buildGrid=(modeKey)=>{
     const rows=currentPromo[modeKey]?.default||[];
