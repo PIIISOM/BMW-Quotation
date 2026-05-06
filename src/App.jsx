@@ -438,11 +438,11 @@ function ModeButton({modeKey,active,onClick}){
     <button onClick={onClick}
       className={`flex flex-col items-center justify-center rounded-lg px-2 py-2.5 text-center transition-all border-2 ${
         active
-        ?"bg-gradient-to-b from-[#1c69d4] to-[#1557b0] text-neutral-900 shadow-xl border-[#1557b0] scale-110 ring-2 ring-[#1c69d4]/50"
+        ?"bg-gradient-to-b from-[#1c69d4] to-[#1557b0] text-white shadow-xl border-[#1557b0] scale-110 ring-2 ring-[#1c69d4]/50"
         :"bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200 hover:border-[#1c69d4]/30"
       }`}>
       <span className={`text-[12px] font-bold tracking-tight ${active?"drop-shadow-lg":""}`}>{m.label}</span>
-      <span className={`text-[9px] mt-0.5 ${active?"text-neutral-700":"text-neutral-500"}`}>{m.thaiName}</span>
+      <span className={`text-[9px] mt-0.5 ${active?"text-white/80":"text-neutral-500"}`}>{m.thaiName}</span>
     </button>
   );
 }
@@ -623,6 +623,10 @@ function FreebieManager({items,onSave,onClose,onBack}){
   };
   
   const save=()=>{
+    if(editing){
+      alert("กรุณาบันทึกหรือยกเลิกการแก้ไขรายการก่อน");
+      return;
+    }
     onSave(freebies);
     if(onBack)onBack();
     else onClose();
@@ -1198,7 +1202,8 @@ function SummaryScreen({
   const fmt=n=>Number(n||0).toLocaleString("th-TH");
 
   // คำนวณค่าใช้จ่ายวันรับรถ
-  const totalExpense=(result.downAmt||0)+(redPlateDeposit||0)+(regFee||0);
+  const downOrDeposit=MODES[mode]?.hasDeposit?(result.depositAmt||0):(result.downAmt||0);
+  const totalExpense=downOrDeposit+(redPlateDeposit||0)+(regFee||0);
   const totalDeduct=(discount||0)+(depositPaid||0);
   const remaining=totalExpense-totalDeduct;
 
@@ -1222,7 +1227,7 @@ function SummaryScreen({
     lines.push(`ราคา: ${fmt(result.carPrice)} บาท`);
     lines.push(`━━━━━━━━━━━━━━━`);
     lines.push(`💰 การผ่อนชำระ`);
-    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท (${MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)`);
+    lines.push(`เงินดาวน์: ${fmt(downOrDeposit)} บาท (${MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)`);
     lines.push(`ยอดจัด: ${fmt(result.finance)} บาท`);
     lines.push(`ค่างวด: ${fmt(result.monthly)} บาท/เดือน`);
     lines.push(`จำนวนงวด: ${inputs.term||0} เดือน`);
@@ -1234,7 +1239,7 @@ function SummaryScreen({
     }
     lines.push(`━━━━━━━━━━━━━━━`);
     lines.push(`🧾 ค่าใช้จ่ายวันรับรถ`);
-    lines.push(`เงินดาวน์: ${fmt(result.downAmt)} บาท`);
+    lines.push(`เงินดาวน์: ${fmt(downOrDeposit)} บาท`);
     lines.push(`ค่ามัดจำป้ายแดง: ${fmt(redPlateDeposit)} บาท`);
     if(regFee>0)lines.push(`ค่าจดทะเบียน: ${fmt(regFee)} บาท`);
     lines.push(`รวม: ${fmt(totalExpense)} บาท`);
@@ -1301,7 +1306,7 @@ function SummaryScreen({
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500">เงินดาวน์</span>
-              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท ({MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)</span>
+              <span className="font-medium tabular-nums">{fmt(downOrDeposit)} บาท ({MODES[mode]?.hasDeposit ? inputs.depositPct||0 : inputs.downPct||0}%)</span>
             </div>
             <div className="flex justify-between">
               <span className="text-neutral-500">ยอดจัดไฟแนนซ์</span>
@@ -1353,7 +1358,7 @@ function SummaryScreen({
             {/* เงินดาวน์ (อ่านอย่างเดียว) */}
             <div className="flex justify-between items-center text-sm">
               <span className="text-neutral-500">เงินดาวน์</span>
-              <span className="font-medium tabular-nums">{fmt(result.downAmt)} บาท</span>
+              <span className="font-medium tabular-nums">{fmt(downOrDeposit)} บาท</span>
             </div>
 
             {/* ค่ามัดจำป้ายแดง */}
@@ -1446,10 +1451,10 @@ function SummaryScreen({
 }
 
 
-function DownTableScreen({carModel,mode,inputs,discount,onClose}){
+function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,onClose}){
   const DOWN_PCTS=[20,25,30,35];
-  const [selectedTerm,setSelectedTerm]=useState(Number(inputs.term)||60);
-  const TERMS=[48,60,72];
+  const TERMS=promotionTerms&&promotionTerms.length>0?promotionTerms:[48,60,72];
+  const [selectedTerm,setSelectedTerm]=useState(TERMS.includes(Number(inputs.term)||60)?Number(inputs.term)||60:TERMS[0]);
   const modeInfo=MODES[mode];
   const key=modeInfo.hasDeposit?'depositPct':'downPct';
   const data=DOWN_PCTS.map(pct=>{
@@ -1870,16 +1875,20 @@ export default function App(){
   const saveQuote=()=>{
     const id=Date.now(), key=`quote:${id}`;
     try{
-      localStorage.setItem(key,JSON.stringify({id,mode,inputs,carModel,customerName,customerPhone,salesName,discount,savedAt:id,monthly:result.monthly,finance:result.finance}));
+      localStorage.setItem(key,JSON.stringify({id,mode,inputs,carModel,selectedCar,selectedBSI,customerName,customerPhone,salesName,discount,savedAt:id,monthly:result.monthly,finance:result.finance}));
       showToast("บันทึกเรียบร้อย ✓"); loadSavedList();
     }catch{showToast("บันทึกไม่สำเร็จ");}
   };
-  
+
   const loadQuote=q=>{
     setMode(q.mode); setInputs(q.inputs);
     setCarModel(q.carModel||""); setCustomerName(q.customerName||"");
-    setCustomerPhone(q.customerPhone||""); 
+    setCustomerPhone(q.customerPhone||"");
     setDiscount(q.discount||0);
+    // restore selectedCar: จาก saved data ก่อน ถ้าไม่มีให้หาจาก carDB (รองรับ quote เก่า)
+    const car=q.selectedCar||carDB.find(c=>c.model===(q.carModel||""))||null;
+    setSelectedCar(car);
+    setSelectedBSI(q.selectedBSI||(car?car.bsiStd:null));
     setShowSaved(false); showToast("โหลดข้อมูลแล้ว ✓");
   };
   
@@ -2365,6 +2374,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           mode={mode}
           inputs={inputs}
           discount={discount}
+          promotionTerms={(promotions[currentPromoId]?.terms||[48,60]).map(Number).sort((a,b)=>a-b)}
           onClose={()=>setShowDownTable(false)}
         />
       )}
