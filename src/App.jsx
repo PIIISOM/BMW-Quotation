@@ -26,7 +26,7 @@ const saveToCloud = async (key, value) => {
   }
 };
 
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.5.1";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
@@ -69,58 +69,75 @@ const DEFAULT_PROMOTION = {
   terms: [48, 60],
   HP: {
     default: [
-      { min: 20, max: 35, term: 48, rate: 2.79 },
-      { min: 20, max: 35, term: 60, rate: 2.89 },
-      { min: 0,  max: 19, term: 48, rate: 2.99 },
-      { min: 0,  max: 19, term: 60, rate: 3.09 },
+      { min: 0, max: 19, rate: 2.49 },
+      { min: 20, max: 35, rate: 1.99 },
+      { min: 36, max: 100, rate: 1.59 }
     ],
     special: []
   },
   "HP-BL": {
     default: [
-      { min: 20, max: 35, term: 48, rate: 7.50 },
-      { min: 20, max: 35, term: 60, rate: 7.66 },
-      { min: 0,  max: 19, term: 48, rate: 7.68 },
-      { min: 0,  max: 19, term: 60, rate: 7.84 },
+      { min: 0, max: 19, rate: 8.20 },
+      { min: 20, max: 35, rate: 7.66 },
+      { min: 36, max: 100, rate: 7.20 }
     ],
     special: []
   },
   FC: {
     default: [
-      { min: 20, max: 35, term: 48, rate: 7.50 },
-      { min: 20, max: 35, term: 60, rate: 7.66 },
-      { min: 0,  max: 19, term: 48, rate: 7.68 },
-      { min: 0,  max: 19, term: 60, rate: 7.84 },
+      { min: 0, max: 19, rate: 8.20 },
+      { min: 20, max: 35, rate: 7.66 },
+      { min: 36, max: 100, rate: 7.20 }
     ],
     special: []
   },
   FL: {
     default: [
-      { min: 20, max: 35, term: 48, rate: 8.10 },
-      { min: 20, max: 35, term: 60, rate: 8.26 },
-      { min: 0,  max: 19, term: 48, rate: 8.28 },
-      { min: 0,  max: 19, term: 60, rate: 8.44 },
+      { min: 0, max: 19, rate: 9.00 },
+      { min: 20, max: 35, rate: 8.44 },
+      { min: 36, max: 100, rate: 8.00 }
     ],
     special: []
   },
   "FL-BL": {
     default: [
-      { min: 20, max: 35, term: 48, rate: 8.10 },
-      { min: 20, max: 35, term: 60, rate: 8.26 },
-      { min: 0,  max: 19, term: 48, rate: 8.28 },
-      { min: 0,  max: 19, term: 60, rate: 8.44 },
+      { min: 0, max: 19, rate: 7.50 },
+      { min: 20, max: 35, rate: 6.86 },
+      { min: 36, max: 100, rate: 6.50 }
     ],
     special: []
   }
 };
 
 // ฟังก์ชันหาอัตราดอกเบี้ย
+// แปลง format โปรโมชั่นเก่า (ไม่มี term ใน tier) → format ใหม่
+const migratePromotion = (promo) => {
+  if (!promo) return promo;
+  const DEFAULT_TERMS = (promo.terms || [48, 60]).map(Number);
+  const modes = ["HP","HP-BL","FC","FL","FL-BL"];
+  const migrated = { ...promo };
+  modes.forEach(m => {
+    if (!promo[m]?.default) return;
+    const hasTermField = promo[m].default.some(t => t.term !== undefined);
+    if (hasTermField) return;
+    const newDefault = [];
+    promo[m].default.forEach(tier => {
+      DEFAULT_TERMS.forEach(term => {
+        newDefault.push({ ...tier, term: Number(term) });
+      });
+    });
+    migrated[m] = { ...promo[m], default: newDefault };
+  });
+  return migrated;
+};
+
 const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
   if (!promotionData || !promotionData[mode]) return null;
-  const modeData = promotionData[mode];
+  const migratedPromo = migratePromotion(promotionData);
+  const modeData = migratedPromo[mode];
   const termNum = Number(term) || 60;
 
-  // 1. เช็ค Special Rates ก่อน (fuzzy match ชื่อรถ)
+  // 1. Special Rates (fuzzy match ชื่อรถ)
   if (modeData.special && modeData.special.length > 0) {
     const special = modeData.special.find(s => {
       const modelLower = carModel.toLowerCase().trim();
@@ -136,10 +153,10 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
     }
   }
 
-  // 2. match ทั้ง down% และ term
+  // 2. Default Tier — match ทั้ง down% และ term
   if (modeData.default && modeData.default.length > 0) {
     const tier = modeData.default.find(t =>
-      downPct >= t.min && downPct <= t.max && t.term === termNum
+      downPct >= t.min && downPct <= t.max && Number(t.term) === termNum
     );
     if (tier) {
       return {
@@ -148,10 +165,8 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
         source: `Down ${tier.min === 0 && tier.max < 20 ? `< ${tier.max + 1}` : `${tier.min}-${tier.max}`}% · ${termNum} เดือน`
       };
     }
-    // 3. fallback — match เฉพาะ down% (ถ้าไม่มี term ตรงกัน)
-    const tierByDown = modeData.default.find(t =>
-      downPct >= t.min && downPct <= t.max
-    );
+    // 3. fallback — match เฉพาะ down%
+    const tierByDown = modeData.default.find(t => downPct >= t.min && downPct <= t.max);
     if (tierByDown) {
       return {
         rate: tierByDown.rate,
@@ -729,7 +744,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     if(activeTerms.includes(t)){alert("❌ Term นี้มีอยู่แล้ว");return;}
     setPromos(prev=>{
       const updated={...prev};
-      const cur=updated[activePromo]||{...DEFAULT_PROMOTION};
+      const cur=migratePromotion(updated[activePromo]||{...DEFAULT_PROMOTION});
       const newTerms=[...(cur.terms||[48,60]),t].sort((a,b)=>a-b);
       const newPromo={...cur,terms:newTerms};
       ["HP","HP-BL","FC","FL","FL-BL"].forEach(m=>{
@@ -746,15 +761,16 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   };
 
   const updateRate=(modeKey,downMin,downMax,term,newRate)=>{
-    // เก็บ string ดิบไว้ก่อน ไม่ validate ระหว่างพิมพ์
     setPromos(prev=>{
       const updated={...prev};
       if(!updated[activePromo])updated[activePromo]={...DEFAULT_PROMOTION};
       if(!updated[activePromo][modeKey])updated[activePromo][modeKey]={default:[],special:[]};
       updated[activePromo][modeKey]={
         ...updated[activePromo][modeKey],
-        default:updated[activePromo][modeKey].default.map(t=>
-          t.min===downMin&&t.max===downMax&&Number(t.term)===Number(term)?{...t,rate:newRate}:t
+        default:updated[activePromo][modeKey].default.map(r=>
+          r.min===downMin&&r.max===downMax&&Number(r.term)===Number(term)
+            ?{...r,rate:newRate}
+            :r
         )
       };
       return updated;
@@ -783,7 +799,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
       const updated={...prev};
       updated[activePromo][modeKey]={
         ...updated[activePromo][modeKey],
-        default:updated[activePromo][modeKey].default.filter(t=>!(t.min===downMin&&t.max===downMax))
+        default:updated[activePromo][modeKey].default.filter(r=>!(r.min===downMin&&r.max===downMax))
       };
       return updated;
     });
@@ -792,13 +808,21 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const addSpecialRate=(mode)=>{setEditingMode(mode);setEditingSpecial({model:"",downMin:20,downMax:35,rate:0});};
 
   const saveSpecialRate=()=>{
-    if(!editingSpecial||!editingSpecial.model||editingSpecial.rate<=0){alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- รุ่นรถ\n- อัตราดอกเบี้ย (มากกว่า 0)");return;}
-    if(editingSpecial.downMin<0||editingSpecial.downMax>100||editingSpecial.downMin>=editingSpecial.downMax){alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;}
+    if(!editingSpecial||!editingSpecial.model||editingSpecial.rate<=0){
+      alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- รุ่นรถ\n- อัตราดอกเบี้ย (มากกว่า 0)");
+      return;
+    }
+    if(editingSpecial.downMin<0||editingSpecial.downMax>100||editingSpecial.downMin>=editingSpecial.downMax){
+      alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;
+    }
     setPromos(prev=>{
       const updated={...prev};
       if(!updated[activePromo])updated[activePromo]={...DEFAULT_PROMOTION};
       if(!updated[activePromo][editingMode])updated[activePromo][editingMode]={default:[],special:[]};
-      updated[activePromo][editingMode]={...updated[activePromo][editingMode],special:[...(updated[activePromo][editingMode].special||[]),editingSpecial]};
+      updated[activePromo][editingMode]={
+        ...updated[activePromo][editingMode],
+        special:[...(updated[activePromo][editingMode].special||[]),editingSpecial]
+      };
       return updated;
     });
     setEditingSpecial(null);setEditingMode("");
@@ -816,7 +840,6 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   };
 
   const save=()=>{
-    // validate rate ทั้งหมดก่อน save
     for(const modeKey of ["HP","HP-BL","FC","FL","FL-BL"]){
       const rows=promos[activePromo]?.[modeKey]?.default||[];
       for(const row of rows){
@@ -832,12 +855,13 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   };
 
   const buildGrid=(modeKey)=>{
-    const rows=currentPromo[modeKey]?.default||[];
+    const promo=migratePromotion(currentPromo);
+    const rows=promo[modeKey]?.default||[];
     const groups={};
     rows.forEach(r=>{
       const key=`${r.min}-${r.max}`;
       if(!groups[key])groups[key]={min:r.min,max:r.max,rates:{}};
-      groups[key].rates[String(r.term)]=r.rate;
+      groups[key].rates[Number(r.term)]=r.rate;
     });
     return Object.values(groups).sort((a,b)=>b.min-a.min);
   };
@@ -853,17 +877,13 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
             <button onClick={onClose} className="rounded-full p-1.5 hover:bg-neutral-100"><X size={16}/></button>
           </div>
         </div>
-
         <div className="overflow-auto flex-1 p-4 space-y-4">
-          {/* Promo Selector */}
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
             <label className="block text-xs font-medium text-neutral-600 mb-2">โปรโมชั่นปัจจุบัน</label>
             <select value={activePromo} onChange={e=>setActivePromo(e.target.value)} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white">
               {Object.keys(promos).map(id=>(<option key={id} value={id}>{promos[id].month||id}</option>))}
             </select>
           </div>
-
-          {/* Term Selector */}
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
             <span className="block text-xs font-medium text-neutral-600 mb-2">ระยะเวลาผ่อน (Terms) ที่ใช้</span>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -887,10 +907,8 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
               </button>
             </div>
           </div>
-
-          {/* Mode Sections */}
           {["HP","HP-BL","FC","FL","FL-BL"].map(modeKey=>{
-            const modeData=currentPromo[modeKey]||{default:[],special:[]};
+            const modeData=migratePromotion(currentPromo)[modeKey]||{default:[],special:[]};
             const m=MODES[modeKey];
             const grid=buildGrid(modeKey);
             return(
@@ -921,8 +939,9 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                             </td>
                             {activeTerms.map(t=>(
                               <td key={t} className="py-1 px-1 text-center">
-                                <input type="number" step="0.01" value={row.rates[t]??""} placeholder="0"
-                                  onChange={e=>updateRate(modeKey,row.min,row.max,Number(t),e.target.value)}
+                                <input type="text" inputMode="decimal"
+                                  value={row.rates[t]??0}
+                                  onChange={e=>updateRate(modeKey,row.min,row.max,t,e.target.value)}
                                   className="w-16 rounded-md border border-neutral-200 px-1 py-1 text-xs text-center font-medium text-neutral-900 focus:border-[#1c69d4] focus:outline-none"/>
                               </td>
                             ))}
@@ -944,7 +963,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                       <span className="text-xs text-neutral-400">–</span>
                       <input id={`dmax-${modeKey}`} type="number" placeholder="max" className="w-14 rounded border border-neutral-200 px-2 py-1 text-xs text-center"/>
                       <span className="text-xs text-neutral-600">%</span>
-                      <button onClick={()=>{addDownTier(modeKey,document.getElementById(`dmin-${modeKey}`).value,document.getElementById(`dmax-${modeKey}`).value);}}
+                      <button onClick={()=>addDownTier(modeKey,document.getElementById(`dmin-${modeKey}`).value,document.getElementById(`dmax-${modeKey}`).value)}
                         className="rounded-lg bg-[#1c69d4] text-white px-3 py-1 text-xs font-semibold">เพิ่ม</button>
                       <button onClick={()=>setEditingTier(null)} className="text-neutral-400 hover:text-neutral-600 text-xs">ยกเลิก</button>
                     </div>
@@ -978,7 +997,6 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
           })}
         </div>
       </div>
-
       {editingSpecial&&(
         <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditingSpecial(null)}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={e=>e.stopPropagation()}>
@@ -1055,7 +1073,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
           <div className="border-t border-neutral-200 pt-4">
             <label className="text-sm font-medium text-neutral-700 mb-2 block">จัดการข้อมูล</label>
             
-            <button onClick={()=>{onOpenCarManager();}} 
+            <button onClick={()=>{onClose(); onOpenCarManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-neutral-100 p-2">
@@ -1069,7 +1087,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
             
-            <button onClick={()=>{onOpenPromoManager();}} 
+            <button onClick={()=>{onClose(); onOpenPromoManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-amber-100 p-2">
@@ -1083,7 +1101,7 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
             
-            <button onClick={()=>{onOpenFreebieManager();}} 
+            <button onClick={()=>{onClose(); onOpenFreebieManager();}} 
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-green-100 p-2">
@@ -1432,16 +1450,13 @@ function DownTableScreen({carModel,mode,inputs,discount,onClose}){
   const DOWN_PCTS=[20,25,30,35];
   const [selectedTerm,setSelectedTerm]=useState(Number(inputs.term)||60);
   const TERMS=[48,60,72];
-
   const modeInfo=MODES[mode];
   const key=modeInfo.hasDeposit?'depositPct':'downPct';
-
   const data=DOWN_PCTS.map(pct=>{
     const newInputs={...inputs,[key]:pct,term:selectedTerm};
     const r=calculate(mode,newInputs,discount||0);
     return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly};
   });
-
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3">
@@ -1770,7 +1785,6 @@ export default function App(){
   
   const setField=(k,v)=>{
     setInputs(prev=>({...prev,[k]:v}));
-    // Auto-fill ดอกเบี้ยเมื่อเปลี่ยน Down% หรือ Term
     if((k==='downPct'||k==='depositPct'||k==='term') && currentPromoId && carModel){
       const downPct=k==='downPct'||k==='depositPct'
         ? Number(v)
@@ -1873,11 +1887,11 @@ export default function App(){
     if(!confirm("ต้องการลบ Quote นี้ใช่ไหม?"))return;
     try{localStorage.removeItem(key); loadSavedList(); showToast("ลบแล้ว");}catch{}
   };
-
+  
   const validityDate=new Date();
   validityDate.setDate(validityDate.getDate()+3);
   const validityStr=validityDate.toLocaleDateString("th-TH",{year:"numeric",month:"short",day:"numeric"});
-  
+
   const copyTextQuote=()=>{
     const actualPrice=result.carPrice + (Number(discount)||0);
     
