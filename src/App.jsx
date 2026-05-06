@@ -792,9 +792,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const addSpecialRate=(mode)=>{setEditingMode(mode);setEditingSpecial({model:"",downMin:20,downMax:35,rate:0});};
 
   const saveSpecialRate=()=>{
-    if(!editingSpecial||!editingSpecial.model||editingSpecial.rate<=0){alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน
-- รุ่นรถ
-- อัตราดอกเบี้ย (มากกว่า 0)");return;}
+    if(!editingSpecial||!editingSpecial.model||editingSpecial.rate<=0){alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- รุ่นรถ\n- อัตราดอกเบี้ย (มากกว่า 0)");return;}
     if(editingSpecial.downMin<0||editingSpecial.downMax>100||editingSpecial.downMin>=editingSpecial.downMax){alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;}
     setPromos(prev=>{
       const updated={...prev};
