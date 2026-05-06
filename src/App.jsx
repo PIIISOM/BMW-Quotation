@@ -1555,6 +1555,10 @@ export default function App(){
   const[regFee,setRegFee]=useState(0);
   const[depositPaid,setDepositPaid]=useState(0);
   
+  useEffect(()=>{
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
+
   const toggleDarkMode=()=>{
     setDarkMode(prev=>{
       localStorage.setItem("darkMode",String(!prev));
@@ -1954,7 +1958,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
   };
   
   return(
-    <div className={`min-h-screen bg-neutral-50${darkMode?" dark":""}`} style={{fontFamily:"'Inter',-apple-system,sans-serif"}}>
+    <div className="min-h-screen bg-neutral-50" style={{fontFamily:"'Inter',-apple-system,sans-serif"}}>
       {/* HEADER */}
       <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
