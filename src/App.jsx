@@ -26,7 +26,7 @@ const saveToCloud = async (key, value) => {
   }
 };
 
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.6.0";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
@@ -1990,11 +1990,6 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
             </button>
           </div>
         </div>
-        <div className="mx-auto max-w-md px-3 pb-3">
-          <div className="grid grid-cols-5 gap-1.5">
-            {Object.keys(MODES).map(k=><ModeButton key={k} modeKey={k} active={mode===k} onClick={()=>switchMode(k)}/>)}
-          </div>
-        </div>
       </header>
       
       {/* MAIN */}
@@ -2010,6 +2005,13 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
               placeholder="ชื่อลูกค้า" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
             <input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
               placeholder="เบอร์โทร" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
+          </div>
+        </div>
+
+        {/* Car Selection */}
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+            <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>รุ่นรถ
           </div>
           <CarSelector value={carModel} onSelect={handleCarSelect} carDB={carDB}/>
           {selectedCar&&(
@@ -2052,6 +2054,16 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           </div>
         </div>
         
+        {/* Mode Selection */}
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+            <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>รูปแบบการผ่อน
+          </div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {Object.keys(MODES).map(k=><ModeButton key={k} modeKey={k} active={mode===k} onClick={()=>switchMode(k)}/>)}
+          </div>
+        </div>
+
         {/* Inputs */}
         <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
