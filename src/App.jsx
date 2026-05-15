@@ -26,7 +26,7 @@ const saveToCloud = async (key, value) => {
   }
 };
 
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.11.0";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
@@ -693,7 +693,7 @@ function FreebieManager({items,onSave,onClose,onBack}){
       
       {/* Edit Dialog */}
       {editing&&(
-        <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditing(null)}>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditing(null)}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={e=>e.stopPropagation()}>
             <h3 className="text-lg font-bold text-neutral-900 mb-4">{editing==="new"?"เพิ่ม":"แก้ไข"}รายการของแถม</h3>
             <div className="space-y-3">
@@ -751,6 +751,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const[addingMonth,setAddingMonth]=useState(false);
   const[newMonthName,setNewMonthName]=useState("");
   const MAX_MONTHS=6;
+  const customTermRef=useRef(null);
 
   const currentPromo=promos[activePromo]||{...DEFAULT_PROMOTION};
   const activeTerms=(currentPromo.terms||[48,60]).map(Number).sort((a,b)=>a-b);
@@ -981,8 +982,8 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
               ))}
             </div>
             <div className="flex gap-2">
-              <input id="custom-term-input" type="number" placeholder="กำหนดเอง เช่น 36" className="flex-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm"/>
-              <button onClick={()=>{const v=document.getElementById("custom-term-input").value;addCustomTerm(v);document.getElementById("custom-term-input").value="";}}
+              <input ref={customTermRef} type="number" placeholder="กำหนดเอง เช่น 36" className="flex-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm"/>
+              <button onClick={()=>{const v=customTermRef.current?.value||"";addCustomTerm(v);if(customTermRef.current)customTermRef.current.value="";}}
                 className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 flex items-center gap-1">
                 <Plus size={13}/>เพิ่ม
               </button>
@@ -1079,7 +1080,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
         </div>
       </div>
       {editingSpecial&&(
-        <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditingSpecial(null)}>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditingSpecial(null)}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={e=>e.stopPropagation()}>
             <h3 className="text-lg font-bold text-neutral-900 mb-4">เพิ่มอัตราพิเศษ — {MODES[editingMode]?.label}</h3>
             <div className="space-y-3">
@@ -1537,16 +1538,24 @@ function SummaryScreen({
 }
 
 
-function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,onClose}){
+function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPromoData,onClose}){
   const DOWN_PCTS=[20,25,30,35];
   const TERMS=promotionTerms&&promotionTerms.length>0?promotionTerms:[48,60,72];
   const [selectedTerm,setSelectedTerm]=useState(TERMS.includes(Number(inputs.term)||60)?Number(inputs.term)||60:TERMS[0]);
   const modeInfo=MODES[mode];
   const key=modeInfo.hasDeposit?'depositPct':'downPct';
   const data=DOWN_PCTS.map(pct=>{
-    const newInputs={...inputs,[key]:pct,term:selectedTerm};
-    const r=calculate(mode,newInputs,discount||0);
-    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly};
+    let rateInputs={...inputs,[key]:pct,term:selectedTerm};
+    if(currentPromoData&&carModel){
+      const rateInfo=getRateForPromotion(mode,carModel,pct,selectedTerm,currentPromoData);
+      if(rateInfo){
+        if(mode==="HP") rateInputs={...rateInputs,sfFlatRate:rateInfo.rate};
+        else rateInputs={...rateInputs,sfEffRate:rateInfo.rate};
+      }
+    }
+    const r=calculate(mode,rateInputs,discount||0);
+    const rateUsed=mode==="HP"?Number(rateInputs.sfFlatRate):Number(rateInputs.sfEffRate);
+    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:rateUsed};
   });
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
@@ -1605,17 +1614,19 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,onClose})
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ดอกเบี้ย</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
               </tr>
             </thead>
             <tbody>
-              {data.map(({pct,downAmt,monthly},idx)=>(
+              {data.map(({pct,downAmt,monthly,rate},idx)=>(
                 <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
-                  <td className="px-4 py-3 font-semibold text-neutral-700">{pct}%</td>
-                  <td className="px-4 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
+                  <td className="px-3 py-3 font-semibold text-neutral-700">{pct}%</td>
+                  <td className="px-3 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
+                  <td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{(rate||0).toFixed(2)}%</td>
+                  <td className="px-3 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1892,7 +1903,11 @@ export default function App(){
         localStorage.setItem("promotions",JSON.stringify(data.promotions));
         localStorage.setItem("salesName",data.salesName||"");
         localStorage.setItem("freebieItems",JSON.stringify(data.freebieItems||DEFAULT_FREEBIES));
-        
+
+        saveToCloud("carDB", data.carDB);
+        saveToCloud("promotions", data.promotions);
+        saveToCloud("freebieItems", data.freebieItems||DEFAULT_FREEBIES);
+
         showToast("นำเข้าข้อมูลสำเร็จ ✓");
       }catch(err){
         console.error("Import error:",err);
@@ -1960,7 +1975,8 @@ export default function App(){
       
       // Auto-fill rate
       const downPct=MODES[mode].hasDeposit ? (Number(prev.depositPct) || 25) : (Number(prev.downPct) || 25);
-      setTimeout(()=>autoFillRate(mode,car.model,downPct,Number(inputs.term)||60),0);
+      const term=Number(prev.term)||60;
+      setTimeout(()=>autoFillRate(mode,car.model,downPct,term),0);
       
       return newInputs;
     });
@@ -1980,7 +1996,11 @@ export default function App(){
     setShowAdvanced(false);
     setShowSalesDetail(false);
     setShowResetConfirm(false);
-    setAutoFilledRate(null); // ✅ เคลียร์ auto-fill badge
+    setAutoFilledRate(null);
+    setSelectedFreebies([]);
+    setFreebieOther("");
+    setShowFreebies(false);
+    setShowFreebiesCost(false);
     showToast("รีเซ็ตข้อมูลแล้ว ✓");
   };
   
@@ -2003,7 +2023,7 @@ export default function App(){
   const saveQuote=()=>{
     const id=Date.now(), key=`quote:${id}`;
     try{
-      localStorage.setItem(key,JSON.stringify({id,mode,inputs,carModel,selectedCar,selectedBSI,customerName,customerPhone,salesName,discount,savedAt:id,monthly:result.monthly,finance:result.finance}));
+      localStorage.setItem(key,JSON.stringify({id,mode,inputs,carModel,selectedCar,selectedBSI,customerName,customerPhone,salesName,discount,savedAt:id,monthly:result.monthly,finance:result.finance,selectedFreebies,freebieOther}));
       showToast("บันทึกเรียบร้อย ✓"); loadSavedList();
     }catch{showToast("บันทึกไม่สำเร็จ");}
   };
@@ -2017,6 +2037,8 @@ export default function App(){
     const car=q.selectedCar||carDB.find(c=>c.model===(q.carModel||""))||null;
     setSelectedCar(car);
     setSelectedBSI(q.selectedBSI||(car?car.bsiStd:null));
+    setSelectedFreebies(q.selectedFreebies||[]);
+    setFreebieOther(q.freebieOther||"");
     setShowSaved(false); showToast("โหลดข้อมูลแล้ว ✓");
   };
   
@@ -2564,6 +2586,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           inputs={inputs}
           discount={discount}
           promotionTerms={(promotions[currentPromoId]?.terms||[48,60]).map(Number).sort((a,b)=>a-b)}
+          currentPromoData={promotions[currentPromoId]||null}
           onClose={()=>setShowDownTable(false)}
         />
       )}
