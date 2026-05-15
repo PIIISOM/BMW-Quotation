@@ -26,7 +26,7 @@ const saveToCloud = async (key, value) => {
   }
 };
 
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.10.0";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
@@ -34,31 +34,36 @@ const DEFAULT_FREEBIES = [
     id: "fb-001",
     name: "BSI Ultimate (5 ปี)",
     detail: "5 ปี / 100,000 กม.",
-    cost: 45000
+    cost: 45000,
+    displayValue: 0
   },
   {
     id: "fb-002",
     name: "ประกันภัยชั้น 1",
     detail: "+ พ.ร.บ. 1 ปี",
-    cost: 25000
+    cost: 25000,
+    displayValue: 0
   },
   {
     id: "fb-003",
     name: "ฟิล์มเซรามิค",
     detail: "รอบคัน",
-    cost: 18000
+    cost: 18000,
+    displayValue: 0
   },
   {
     id: "fb-004",
     name: "ชุดแต่ง M Sport",
     detail: "Body Kit ครบชุด",
-    cost: 120000
+    cost: 120000,
+    displayValue: 0
   },
   {
     id: "fb-005",
     name: "พรมปูพื้น + ผ้ายาง",
     detail: "ชุดครบ 4 ชิ้น",
-    cost: 8500
+    cost: 8500,
+    displayValue: 0
   }
 ];
 
@@ -575,44 +580,45 @@ function CarManager({carDB,onSave,onClose,onBack}){
 function FreebieManager({items,onSave,onClose,onBack}){
   const[freebies,setFreebies]=useState(items);
   const[editing,setEditing]=useState(null);
-  const[editData,setEditData]=useState({name:"",detail:"",cost:0});
-  
+  const[editData,setEditData]=useState({name:"",detail:"",cost:0,displayValue:0});
+
   const addNew=()=>{
     setEditing("new");
-    setEditData({name:"",detail:"",cost:0});
+    setEditData({name:"",detail:"",cost:0,displayValue:0});
   };
-  
+
   const editItem=item=>{
     setEditing(item.id);
-    setEditData({name:item.name,detail:item.detail,cost:item.cost});
+    setEditData({name:item.name,detail:item.detail,cost:item.cost,displayValue:item.displayValue||0});
   };
-  
+
   const saveEdit=()=>{
     if(!editData.name||editData.cost<=0){
       alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- ชื่อของแถม\n- ต้นทุน (มากกว่า 0)");
       return;
     }
-    
+
     if(editing==="new"){
       const newItem={
         id:`fb-${Date.now()}`,
         name:editData.name,
         detail:editData.detail,
-        cost:Number(editData.cost)
+        cost:Number(editData.cost),
+        displayValue:Number(editData.displayValue)||0
       };
       setFreebies([...freebies,newItem]);
     }else{
       setFreebies(freebies.map(f=>
         f.id===editing
-        ?{...f,name:editData.name,detail:editData.detail,cost:Number(editData.cost)}
+        ?{...f,name:editData.name,detail:editData.detail,cost:Number(editData.cost),displayValue:Number(editData.displayValue)||0}
         :f
       ));
     }
-    
+
     setEditing(null);
-    setEditData({name:"",detail:"",cost:0});
+    setEditData({name:"",detail:"",cost:0,displayValue:0});
   };
-  
+
   const deleteItem=id=>{
     const item=freebies.find(f=>f.id===id);
     if(!item)return;
@@ -658,7 +664,12 @@ function FreebieManager({items,onSave,onClose,onBack}){
                   <div className="flex-1">
                     <div className="font-semibold text-neutral-900 text-sm">{item.name}</div>
                     {item.detail&&<div className="text-xs text-neutral-600 mt-0.5">{item.detail}</div>}
-                    <div className="text-xs text-neutral-500 mt-1">ต้นทุน: {item.cost.toLocaleString()} บาท</div>
+                    <div className="flex gap-3 mt-1">
+                      <span className="text-xs text-neutral-500">ต้นทุน: {item.cost.toLocaleString()} บาท</span>
+                      {(item.displayValue||0)>0&&(
+                        <span className="text-xs text-[#1c69d4] font-medium">มูลค่า: {item.displayValue.toLocaleString()} บาท</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-1 ml-2">
                     <button onClick={()=>editItem(item)} className="rounded-lg p-2 hover:bg-blue-100 text-blue-600 transition-colors">
@@ -698,12 +709,21 @@ function FreebieManager({items,onSave,onClose,onBack}){
                   placeholder="เช่น 5 ปี / 100,000 กม."
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/10"/>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">ต้นทุน (บาท) *</label>
-                <input type="number" value={editData.cost} onChange={e=>setEditData({...editData,cost:e.target.value})}
-                  placeholder="45000"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/10"/>
-                <p className="text-xs text-neutral-500 mt-1">💡 ต้นทุนนี้ใช้คำนวณงบ Rebate ที่ต้องการ</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1">มูลค่าสินค้า (บาท)</label>
+                  <input type="number" value={editData.displayValue} onChange={e=>setEditData({...editData,displayValue:e.target.value})}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/10"/>
+                  <p className="text-[11px] text-[#1c69d4] mt-1">แสดงให้ลูกค้าเห็นในใบเสนอราคา</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1">ต้นทุน (บาท) *</label>
+                  <input type="number" value={editData.cost} onChange={e=>setEditData({...editData,cost:e.target.value})}
+                    placeholder="45000"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/10"/>
+                  <p className="text-[11px] text-neutral-500 mt-1">คำนวณงบ Rebate (ภายใน)</p>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-6">
@@ -719,11 +739,18 @@ function FreebieManager({items,onSave,onClose,onBack}){
 
 // ============ PROMOTION MANAGER ============
 function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
-  const[promos,setPromos]=useState(promotions);
+  const[promos,setPromos]=useState(()=>{
+    const migrated={};
+    Object.keys(promotions).forEach(id=>{migrated[id]=migratePromotion(promotions[id]);});
+    return migrated;
+  });
   const[activePromo,setActivePromo]=useState(currentPromoId);
   const[editingMode,setEditingMode]=useState("");
   const[editingSpecial,setEditingSpecial]=useState(null);
   const[editingTier,setEditingTier]=useState(null);
+  const[addingMonth,setAddingMonth]=useState(false);
+  const[newMonthName,setNewMonthName]=useState("");
+  const MAX_MONTHS=6;
 
   const currentPromo=promos[activePromo]||{...DEFAULT_PROMOTION};
   const activeTerms=(currentPromo.terms||[48,60]).map(Number).sort((a,b)=>a-b);
@@ -854,8 +881,30 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
         }
       }
     }
-    onSave({currentPromo:activePromo,promotions:promos});
+    // keep newest MAX_MONTHS months, always include activePromo
+    const allKeys=Object.keys(promos).sort((a,b)=>(promos[b].importedAt||0)-(promos[a].importedAt||0));
+    const keep=[activePromo,...allKeys.filter(k=>k!==activePromo)].slice(0,MAX_MONTHS);
+    const trimmed={};keep.forEach(k=>{if(promos[k])trimmed[k]=promos[k];});
+    onSave({currentPromo:activePromo,promotions:trimmed});
     if(onBack)onBack();else onClose();
+  };
+
+  const addNewMonth=()=>{
+    const name=newMonthName.trim();
+    if(!name){alert("❌ กรุณาใส่ชื่อเดือนโปรโมชั่น");return;}
+    const id=`promo-${Date.now()}`;
+    const base=promos[activePromo]||{...DEFAULT_PROMOTION};
+    setPromos(prev=>({...prev,[id]:{...base,month:name,importedAt:Date.now()}}));
+    setActivePromo(id);
+    setAddingMonth(false);setNewMonthName("");
+  };
+
+  const deletePromo=(id)=>{
+    if(Object.keys(promos).length<=1){alert("❌ ต้องมีโปรโมชั่นอย่างน้อย 1 รายการ");return;}
+    if(!confirm(`ลบโปรโมชั่น "${promos[id]?.month||id}" ?\nข้อมูลจะหายถาวรหลังบันทึก`))return;
+    const remaining=Object.keys(promos).filter(k=>k!==id);
+    setPromos(prev=>{const u={...prev};delete u[id];return u;});
+    if(activePromo===id)setActivePromo(remaining[0]||"");
   };
 
   const buildGrid=(modeKey)=>{
@@ -882,11 +931,39 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
           </div>
         </div>
         <div className="overflow-auto flex-1 p-4 space-y-4">
-          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
-            <label className="block text-xs font-medium text-neutral-600 mb-2">โปรโมชั่นปัจจุบัน</label>
-            <select value={activePromo} onChange={e=>setActivePromo(e.target.value)} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white">
-              {Object.keys(promos).map(id=>(<option key={id} value={id}>{promos[id].month||id}</option>))}
-            </select>
+          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-neutral-600">โปรโมชั่นที่บันทึกไว้</label>
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-neutral-200 text-neutral-600">{Object.keys(promos).length}/{MAX_MONTHS} เดือน</span>
+            </div>
+            <div className="flex gap-2">
+              <select value={activePromo} onChange={e=>setActivePromo(e.target.value)} className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white">
+                {Object.keys(promos).sort((a,b)=>(promos[b].importedAt||0)-(promos[a].importedAt||0)).map(id=>(<option key={id} value={id}>{promos[id].month||id}</option>))}
+              </select>
+              {Object.keys(promos).length>1&&(
+                <button onClick={()=>deletePromo(activePromo)} title="ลบเดือนนี้"
+                  className="rounded-lg border border-red-200 px-2.5 hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                  <Trash2 size={14}/>
+                </button>
+              )}
+            </div>
+            {addingMonth?(
+              <div className="flex gap-2 items-center bg-blue-50 border border-blue-200 rounded-lg p-2">
+                <input type="text" value={newMonthName} onChange={e=>setNewMonthName(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addNewMonth()}
+                  placeholder="ชื่อเดือน เช่น มิ.ย. 2568" autoFocus
+                  className="flex-1 rounded border border-neutral-200 px-2 py-1 text-xs focus:border-[#1c69d4] focus:outline-none"/>
+                <button onClick={addNewMonth} className="rounded-lg bg-[#1c69d4] text-white px-3 py-1 text-xs font-semibold">เพิ่ม</button>
+                <button onClick={()=>{setAddingMonth(false);setNewMonthName("");}} className="text-neutral-400 hover:text-neutral-600 text-xs">ยกเลิก</button>
+              </div>
+            ):Object.keys(promos).length<MAX_MONTHS?(
+              <button onClick={()=>setAddingMonth(true)}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-300 py-1.5 text-xs font-medium text-neutral-500 hover:border-[#1c69d4] hover:text-[#1c69d4] hover:bg-blue-50 transition-colors">
+                <Plus size={13}/>เพิ่มเดือนใหม่ (copy rates จากเดือนนี้)
+              </button>
+            ):(
+              <p className="text-[11px] text-neutral-400 text-center">เต็ม {MAX_MONTHS} เดือนแล้ว — ลบเดือนเก่าก่อนเพิ่มใหม่</p>
+            )}
           </div>
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
             <span className="block text-xs font-medium text-neutral-600 mb-2">ระยะเวลาผ่อน (Terms) ที่ใช้</span>
@@ -1334,9 +1411,12 @@ function SummaryScreen({
               {chosenFreebies.map(f=>(
                 <div key={f.id} className="flex items-start gap-2 text-sm">
                   <span className="mt-0.5 text-green-500 flex-shrink-0">✓</span>
-                  <div>
+                  <div className="flex-1">
                     <div className="font-medium text-neutral-900">{f.name}</div>
                     {f.detail&&<div className="text-[11px] text-neutral-500">{f.detail}</div>}
+                    {(f.displayValue||0)>0&&(
+                      <div className="text-[11px] font-semibold text-[#1c69d4]">มูลค่า {(f.displayValue).toLocaleString()} บาท</div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1344,6 +1424,12 @@ function SummaryScreen({
                 <div className="flex items-start gap-2 text-sm">
                   <span className="mt-0.5 text-green-500 flex-shrink-0">✓</span>
                   <div className="font-medium text-neutral-900">{freebieOther}</div>
+                </div>
+              )}
+              {chosenFreebies.some(f=>(f.displayValue||0)>0)&&(
+                <div className="mt-2 pt-2 border-t border-neutral-100 flex justify-between text-xs font-semibold">
+                  <span className="text-neutral-600">รวมมูลค่าของแถม</span>
+                  <span className="text-[#1c69d4]">{chosenFreebies.reduce((s,f)=>s+(f.displayValue||0),0).toLocaleString()} บาท</span>
                 </div>
               )}
             </div>
@@ -1575,6 +1661,8 @@ export default function App(){
   const[selectedFreebies,setSelectedFreebies]=useState([]);
   const[freebieOther,setFreebieOther]=useState("");
   const[showFreebieManager,setShowFreebieManager]=useState(false);
+  const[showFreebies,setShowFreebies]=useState(false);
+  const[showFreebiesCost,setShowFreebiesCost]=useState(false);
 
   // Summary Screen State
   const[showSummary,setShowSummary]=useState(false);
@@ -2094,8 +2182,15 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
 
         {/* Inputs */}
         <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-            <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>ข้อมูลคำนวณ
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+            <div className="flex items-center gap-2">
+              <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>ข้อมูลคำนวณ
+            </div>
+            {currentPromoId&&promotions[currentPromoId]?.month&&(
+              <span className="normal-case tracking-normal text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                💰 {promotions[currentPromoId].month}
+              </span>
+            )}
           </div>
           <NumberInput label="ราคารถ" value={inputs.carPrice} onChange={v=>setField("carPrice",v)} suffix="บาท" accent/>
           <div className="grid grid-cols-2 gap-3">
@@ -2204,16 +2299,33 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           )}
           
           {/* FREEBIES SECTION */}
+          <button onClick={()=>setShowFreebies(!showFreebies)}
+            className="flex w-full items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-100">
+            <span className="flex items-center gap-1.5">
+              🎁 ของแถม
+              {selectedFreebies.length>0&&(
+                <span className="bg-[#1c69d4] text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">{selectedFreebies.length}</span>
+              )}
+            </span>
+            <ChevronRight size={14} className={`transition-transform ${showFreebies?"rotate-90":""}`}/>
+          </button>
+          {showFreebies&&(
           <div className="rounded-lg border border-neutral-200 bg-white p-3">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold text-neutral-700">🎁 ของแถม</div>
-              {freebieItems.length===0&&(
-                <button onClick={()=>setShowFreebieManager(true)} className="text-[10px] text-blue-600 hover:underline">
-                  ตั้งค่า
+              <div className="text-xs font-semibold text-neutral-700">รายการของแถม</div>
+              <div className="flex items-center gap-2">
+                <button onClick={e=>{e.stopPropagation();setShowFreebiesCost(!showFreebiesCost)}}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${showFreebiesCost?'border-amber-300 bg-amber-50 text-amber-700':'border-neutral-200 text-neutral-400 hover:text-neutral-600'}`}>
+                  {showFreebiesCost?'ซ่อนต้นทุน':'👁 ต้นทุน'}
                 </button>
-              )}
+                {freebieItems.length===0&&(
+                  <button onClick={()=>setShowFreebieManager(true)} className="text-[10px] text-blue-600 hover:underline">
+                    ตั้งค่า
+                  </button>
+                )}
+              </div>
             </div>
-            
+
             {(() => {
               const rebateBudget = result.rebateAmount || 0;
               const selectedCost = selectedFreebies.reduce((sum, id) => {
@@ -2222,13 +2334,13 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
               }, 0);
               const remaining = rebateBudget - selectedCost;
               const isOverBudget = selectedCost > rebateBudget && rebateBudget > 0;
-              
+
               return (
                 <>
-                  {rebateBudget > 0 && (
+                  {rebateBudget > 0 && showFreebiesCost && (
                     <div className={`mb-3 p-2 rounded-lg text-xs ${
-                      isOverBudget 
-                      ? 'bg-red-50 border border-red-200' 
+                      isOverBudget
+                      ? 'bg-red-50 border border-red-200'
                       : 'bg-neutral-50 border border-neutral-200'
                     }`}>
                       <div className="flex justify-between mb-1">
@@ -2247,13 +2359,13 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                       </div>
                     </div>
                   )}
-                  
+
                   {freebieItems.length > 0 ? (
                     <div className="space-y-2">
                       {freebieItems.map(item => (
                         <label key={item.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-neutral-50 cursor-pointer">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={selectedFreebies.includes(item.id)}
                             onChange={e => {
                               if (e.target.checked) {
@@ -2267,15 +2379,24 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                           <div className="flex-1">
                             <div className="text-xs font-medium text-neutral-900">{item.name}</div>
                             {item.detail && <div className="text-[10px] text-neutral-500">{item.detail}</div>}
-                            <div className="text-[10px] text-neutral-600 mt-0.5">{item.cost.toLocaleString()} บาท</div>
+                            {((item.displayValue||0)>0 || showFreebiesCost) && (
+                              <div className="flex gap-2 mt-0.5">
+                                {(item.displayValue||0)>0&&(
+                                  <span className="text-[10px] text-[#1c69d4] font-medium">มูลค่า {item.displayValue.toLocaleString()} บาท</span>
+                                )}
+                                {showFreebiesCost&&(
+                                  <span className="text-[10px] text-amber-600">ต้นทุน {item.cost.toLocaleString()} บาท</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </label>
                       ))}
-                      
+
                       <div className="pt-2 border-t border-neutral-200">
                         <label className="text-[10px] text-neutral-600 block mb-1">อื่นๆ</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={freebieOther}
                           onChange={e => setFreebieOther(e.target.value)}
                           placeholder="ระบุของแถมอื่นๆ"
@@ -2298,8 +2419,9 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
               );
             })()}
           </div>
+          )}
         </div>
-        
+
         {/* Sales Detail (ซ่อนไว้) */}
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <button onClick={()=>setShowSalesDetail(!showSalesDetail)}
