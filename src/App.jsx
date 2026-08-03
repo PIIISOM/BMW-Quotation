@@ -315,6 +315,9 @@ const calculate = (mode, inputs, discount = 0) => {
     custFlatRate,rebate,rebate85,taxSaving48,taxSaving60,rebateAmount:rebate};
 };
 
+const calcWithBsi = (mode, inputs, discount = 0) =>
+  calculate(mode, { ...inputs, carPrice: (Number(inputs.carPrice)||0) + (Number(inputs.bsi)||0), bsi: 0 }, discount);
+
 const fmtB=n=>(!isFinite(n)||isNaN(n))?"0":Math.round(n).toLocaleString("en-US");
 const fmtB2=n=>(!isFinite(n)||isNaN(n))?"0":n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtP=n=>(!isFinite(n)||isNaN(n))?"0.00%":(n*100).toFixed(2)+"%";
@@ -1553,7 +1556,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
         else rateInputs={...rateInputs,sfEffRate:rateInfo.rate};
       }
     }
-    const r=calculate(mode,rateInputs,discount||0);
+    const r=calcWithBsi(mode,rateInputs,discount||0);
     const rateUsed=mode==="HP"?Number(rateInputs.sfFlatRate):Number(rateInputs.sfEffRate);
     return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:rateUsed};
   });
@@ -1954,7 +1957,7 @@ export default function App(){
       }
     }
   };
-  const result=useMemo(()=>calculate(mode,inputs,discount),[mode,inputs,discount]);
+  const result=useMemo(()=>calcWithBsi(mode,inputs,discount),[mode,inputs,discount]);
   const m=MODES[mode];
   
   const switchMode=newMode=>{
