@@ -1545,6 +1545,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
   const DOWN_PCTS=[20,25,30,35];
   const TERMS=promotionTerms&&promotionTerms.length>0?promotionTerms:[48,60,72];
   const [selectedTerm,setSelectedTerm]=useState(TERMS.includes(Number(inputs.term)||60)?Number(inputs.term)||60:TERMS[0]);
+  const [showRate,setShowRate]=useState(false);
   const modeInfo=MODES[mode];
   const key=modeInfo.hasDeposit?'depositPct':'downPct';
   const data=DOWN_PCTS.map(pct=>{
@@ -1619,8 +1620,13 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
               <tr className="border-b border-neutral-100 bg-neutral-50">
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ดอกเบี้ย</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ยอดผ่อน/เดือน</th>
+                {showRate&&<th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ดอกเบี้ย</th>}
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">
+                  <span className="flex items-center justify-end gap-2">
+                    ยอดผ่อน/เดือน
+                    <button onClick={()=>setShowRate(v=>!v)} className="text-neutral-300 hover:text-neutral-400 text-xs leading-none">···</button>
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1628,7 +1634,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
                 <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
                   <td className="px-3 py-3 font-semibold text-neutral-700">{pct}%</td>
                   <td className="px-3 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
-                  <td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{(rate||0).toFixed(2)}%</td>
+                  {showRate&&<td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{(rate||0).toFixed(2)}%</td>}
                   <td className="px-3 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
                 </tr>
               ))}
