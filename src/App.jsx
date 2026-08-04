@@ -1682,6 +1682,7 @@ export default function App(){
   const[freebieOther,setFreebieOther]=useState("");
   const[showFreebieManager,setShowFreebieManager]=useState(false);
   const[showFreebies,setShowFreebies]=useState(false);
+  const[dataSource,setDataSource]=useState('default');
   const[showFreebiesCost,setShowFreebiesCost]=useState(false);
 
   // Summary Screen State
@@ -1710,7 +1711,16 @@ export default function App(){
     loadSavedList();
 
     // ฟัง Firebase realtime - sync carDB, promotions, freebies ข้ามเครื่อง
+    let dataReceived = false;
+    const timeoutId = setTimeout(() => {
+      if(!dataReceived) { /* dataSource คง 'default' ไว้ — Firestore เงียบไม่เรียก callback */ }
+    }, 5000);
+
     const unsub = onSnapshot(SHARED_DOC, (snap) => {
+      dataReceived = true;
+      clearTimeout(timeoutId);
+      // fromCache=false → ได้จาก network จริง, fromCache=true → ได้จาก Firestore cache (offline)
+      setDataSource(snap.metadata.fromCache ? 'local' : 'firebase');
       try {
         if(snap.exists()){
           const data = snap.data();
@@ -1769,30 +1779,35 @@ export default function App(){
         // Fallback to localStorage
         try {
           const saved=localStorage.getItem("carDB");
-          if(saved){ const p=JSON.parse(saved); if(p?.length>0) setCarDB(p); else setCarDB(DEFAULT_CAR_DB); }
-          else setCarDB(DEFAULT_CAR_DB);
+          const hasLocal=saved && JSON.parse(saved)?.length>0;
+          setDataSource(hasLocal ? 'local' : 'default');
+          if(hasLocal){ setCarDB(JSON.parse(saved)); } else setCarDB(DEFAULT_CAR_DB);
           const savedPromos=localStorage.getItem("promotions");
           if(savedPromos){ const p=JSON.parse(savedPromos); if(p?.promotions){ setPromotions(p.promotions); setCurrentPromoId(p.currentPromo||""); } else initializeDefaultPromotion(); }
           else initializeDefaultPromotion();
           const savedFreebies=localStorage.getItem("freebieItems");
           if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); }
           else setFreebieItems(DEFAULT_FREEBIES);
-        } catch { setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
+        } catch { setDataSource('default'); setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
       }
     }, (err) => {
+      dataReceived = true;
+      clearTimeout(timeoutId);
       console.warn("Firebase offline, using local data:", err);
       // Offline fallback
       try {
         const saved=localStorage.getItem("carDB");
-        if(saved){ const p=JSON.parse(saved); if(p?.length>0) setCarDB(p); else setCarDB(DEFAULT_CAR_DB); } else setCarDB(DEFAULT_CAR_DB);
+        const hasLocal=saved && JSON.parse(saved)?.length>0;
+        setDataSource(hasLocal ? 'local' : 'default');
+        if(hasLocal){ setCarDB(JSON.parse(saved)); } else setCarDB(DEFAULT_CAR_DB);
         const savedPromos=localStorage.getItem("promotions");
         if(savedPromos){ const p=JSON.parse(savedPromos); if(p?.promotions){ setPromotions(p.promotions); setCurrentPromoId(p.currentPromo||""); } else initializeDefaultPromotion(); } else initializeDefaultPromotion();
         const savedFreebies=localStorage.getItem("freebieItems");
         if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); } else setFreebieItems(DEFAULT_FREEBIES);
-      } catch { setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
+      } catch { setDataSource('default'); setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
     });
 
-    return () => unsub(); // cleanup listener
+    return () => { unsub(); clearTimeout(timeoutId); }; // cleanup listener
   },[]);
   
   const initializeDefaultPromotion=()=>{
@@ -2139,6 +2154,26 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
         </div>
       </header>
       
+      {/* DATA SOURCE BANNER */}
+      {dataSource!=='firebase'&&(()=>{
+        const promoDate=(()=>{
+          try{
+            const ts=promotions[currentPromoId]?.importedAt;
+            if(!ts||typeof ts!=='number'||ts<=0) return null;
+            const d=new Date(ts);
+            if(isNaN(d.getTime())) return null;
+            return d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'});
+          }catch{return null;}
+        })();
+        const isDefault=dataSource==='default';
+        return(
+          <div className={`w-full px-4 py-2 text-xs font-medium flex items-center justify-center gap-1.5 ${isDefault?'bg-red-500 text-white':'bg-yellow-400 text-yellow-900'}`}>
+            <span>{isDefault?'⚠️ ยังไม่ได้โหลดข้อมูลจริง — ห้ามใช้เสนอราคา':'ใช้ข้อมูล offline'}</span>
+            {promoDate&&<span className="opacity-70">· อัปเดต {promoDate}</span>}
+          </div>
+        );
+      })()}
+
       {/* MAIN */}
       <main className="mx-auto max-w-md px-4 pb-32 pt-4 space-y-4">
         
