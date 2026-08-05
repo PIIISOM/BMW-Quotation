@@ -147,9 +147,10 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
     const special = modeData.special.find(s => {
       const modelLower = carModel.toLowerCase().trim();
       const specModelLower = s.model.toLowerCase().trim();
-      return modelLower.includes(specModelLower) || specModelLower.includes(modelLower);
+      const modelMatch = modelLower.includes(specModelLower) || specModelLower.includes(modelLower);
+      return modelMatch && downPct >= s.downMin && downPct < s.downMax;
     });
-    if (special && downPct >= special.downMin && downPct <= special.downMax) {
+    if (special) {
       return {
         rate: special.rate,
         type: 'special',
