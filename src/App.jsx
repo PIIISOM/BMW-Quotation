@@ -1976,20 +1976,47 @@ export default function App(){
       }else{
         setInputs(prev=>({...prev,sfEffRate:rateInfo.rate}));
       }
+    }else{
+      setAutoFilledRate(null);
     }
   };
+
+  // อัปเดตเรทอัตโนมัติเมื่อ โหมด / รุ่นรถ / โปรโมชั่นที่ active / ข้อมูลโปรฯ เปลี่ยน
+  useEffect(()=>{
+    if(!carModel || !currentPromoId || !promotions[currentPromoId]){
+      setAutoFilledRate(null);
+      return;
+    }
+    const downPct=MODES[mode].hasDeposit ? (Number(inputs.depositPct)||25) : (Number(inputs.downPct)||25);
+    const term=Number(inputs.term)||60;
+    autoFillRate(mode,carModel,downPct,term);
+  },[mode,carModel,currentPromoId,promotions,inputs.downPct,inputs.term]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const result=useMemo(()=>calcWithBsi(mode,inputs,discount),[mode,inputs,discount]);
   const m=MODES[mode];
   
   const switchMode=newMode=>{
     setMode(newMode);
-    setInputs(prev=>({
+    const base={
       ...DEFAULT_INPUTS[newMode],
-      carPrice:prev.carPrice||DEFAULT_INPUTS[newMode].carPrice,
-      bsi:prev.bsi||0,
-      accessory:prev.accessory||0,
+      carPrice:inputs.carPrice||DEFAULT_INPUTS[newMode].carPrice,
+      bsi:inputs.bsi||0,
+      accessory:inputs.accessory||0,
       ...(selectedCar&&MODES[newMode].hasGFV?{gfv:selectedCar.gfv}:{}),
-    }));
+    };
+    let rateOverride={};
+    if(carModel && currentPromoId && promotions[currentPromoId]){
+      const downPct=MODES[newMode].hasDeposit?(Number(base.depositPct)||25):(Number(base.downPct)||25);
+      const term=Number(base.term)||60;
+      const rateInfo=getRateForPromotion(newMode,carModel,downPct,term,promotions[currentPromoId]);
+      if(rateInfo){
+        setAutoFilledRate(rateInfo);
+        rateOverride=newMode==="HP"?{sfFlatRate:rateInfo.rate}:{sfEffRate:rateInfo.rate};
+      }else{
+        setAutoFilledRate(null);
+      }
+    }
+    setInputs({...base,...rateOverride});
   };
   
   const handleCarSelect=car=>{
