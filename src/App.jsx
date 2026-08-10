@@ -142,19 +142,30 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
   const modeData = migratedPromo[mode];
   const termNum = Number(term) || 60;
 
-  // 1. Special Rates (fuzzy match ชื่อรถ)
+  // 1. Special Rates (fuzzy match ชื่อรถ) — เก็บทุกรายการที่เข้าเกณฑ์ แล้วจัดลำดับความสำคัญ
+  // เพื่อไม่ให้ลำดับในอาร์เรย์เป็นตัวตัดสินแบบเงียบๆ (เคยเป็นบั๊กตอนใช้ .find())
   if (modeData.special && modeData.special.length > 0) {
-    const special = modeData.special.find(s => {
+    const candidates = modeData.special.filter(s => {
       const modelLower = carModel.toLowerCase().trim();
       const specModelLower = s.model.toLowerCase().trim();
       const modelMatch = modelLower.includes(specModelLower) || specModelLower.includes(modelLower);
-      return modelMatch && downPct >= s.downMin && downPct < s.downMax;
+      const hasRateForTerm = (s.rates && typeof s.rates[termNum] === 'number') || typeof s.rate === 'number';
+      return modelMatch && downPct >= s.downMin && downPct < s.downMax && hasRateForTerm;
     });
-    if (special) {
+    if (candidates.length > 0) {
+      const ranked = [...candidates].sort((a, b) => {
+        const aHasTermRate = (a.rates && typeof a.rates[termNum] === 'number') ? 1 : 0;
+        const bHasTermRate = (b.rates && typeof b.rates[termNum] === 'number') ? 1 : 0;
+        if (aHasTermRate !== bHasTermRate) return bHasTermRate - aHasTermRate;
+        return (a.downMax - a.downMin) - (b.downMax - b.downMin);
+      });
+      const special = ranked[0];
+      const hasTermRate = special.rates && typeof special.rates[termNum] === 'number';
       return {
-        rate: special.rate,
+        rate: hasTermRate ? special.rates[termNum] : special.rate,
         type: 'special',
-        source: `${special.model} + Down ${special.downMin}-${special.downMax}%`
+        source: `${special.model} + Down ${special.downMin}-${special.downMax}%`,
+        ...(hasTermRate ? {} : { isLegacy: true })
       };
     }
   }
@@ -798,18 +809,22 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
 
   const updateRate=(modeKey,downMin,downMax,term,newRate)=>{
     setPromos(prev=>{
-      const updated={...prev};
-      if(!updated[activePromo])updated[activePromo]={...DEFAULT_PROMOTION};
-      if(!updated[activePromo][modeKey])updated[activePromo][modeKey]={default:[],special:[]};
-      updated[activePromo][modeKey]={
-        ...updated[activePromo][modeKey],
-        default:updated[activePromo][modeKey].default.map(r=>
-          r.min===downMin&&r.max===downMax&&Number(r.term)===Number(term)
-            ?{...r,rate:newRate}
-            :r
-        )
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const curMode=curPromo[modeKey]||{default:[],special:[]};
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          [modeKey]:{
+            ...curMode,
+            default:curMode.default.map(r=>
+              r.min===downMin&&r.max===downMax&&Number(r.term)===Number(term)
+                ?{...r,rate:newRate}
+                :r
+            )
+          }
+        }
       };
-      return updated;
     });
   };
 
@@ -817,14 +832,19 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     const min=Number(downMin),max=Number(downMax);
     if(isNaN(min)||isNaN(max)||min<0||max>100||min>=max){alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;}
     setPromos(prev=>{
-      const updated={...prev};
-      if(!updated[activePromo][modeKey])updated[activePromo][modeKey]={default:[],special:[]};
+      const curPromo=prev[activePromo];
+      const curMode=curPromo[modeKey]||{default:[],special:[]};
       const newRows=activeTerms.map(t=>({min,max,term:t,rate:0}));
-      updated[activePromo][modeKey]={
-        ...updated[activePromo][modeKey],
-        default:[...updated[activePromo][modeKey].default,...newRows]
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          [modeKey]:{
+            ...curMode,
+            default:[...curMode.default,...newRows]
+          }
+        }
       };
-      return updated;
     });
     setEditingTier(null);
   };
@@ -832,34 +852,59 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const deleteDownTier=(modeKey,downMin,downMax)=>{
     if(!confirm(`ลบ tier Down ${downMin}-${downMax}% ออกทั้งหมด?`))return;
     setPromos(prev=>{
-      const updated={...prev};
-      updated[activePromo][modeKey]={
-        ...updated[activePromo][modeKey],
-        default:updated[activePromo][modeKey].default.filter(r=>!(r.min===downMin&&r.max===downMax))
+      const curPromo=prev[activePromo];
+      const curMode=curPromo[modeKey];
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          [modeKey]:{
+            ...curMode,
+            default:curMode.default.filter(r=>!(r.min===downMin&&r.max===downMax))
+          }
+        }
       };
-      return updated;
     });
   };
 
-  const addSpecialRate=(mode)=>{setEditingMode(mode);setEditingSpecial({model:"",downMin:20,downMax:35,rate:0});};
+  const addSpecialRate=(mode)=>{setEditingMode(mode);setEditingSpecial({model:"",downMin:20,downMax:35,rates:{36:null,48:null,60:null,72:null,84:null}});};
 
   const saveSpecialRate=()=>{
-    if(!editingSpecial||!editingSpecial.model||editingSpecial.rate<=0){
-      alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- รุ่นรถ\n- อัตราดอกเบี้ย (มากกว่า 0)");
+    const hasAnyRate=Object.values(editingSpecial?.rates||{}).some(v=>typeof v==='number');
+    if(!editingSpecial||!editingSpecial.model||!hasAnyRate){
+      alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน\n- รุ่นรถ\n- อัตราดอกเบี้ยอย่างน้อย 1 งวด");
       return;
     }
     if(editingSpecial.downMin<0||editingSpecial.downMax>100||editingSpecial.downMin>=editingSpecial.downMax){
       alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;
     }
+    const existingSpecial=promos[activePromo]?.[editingMode]?.special||[];
+    const modelLower=editingSpecial.model.toLowerCase().trim();
+    const overlaps=existingSpecial.filter(s=>{
+      const specModelLower=s.model.toLowerCase().trim();
+      const modelMatch=modelLower.includes(specModelLower)||specModelLower.includes(modelLower);
+      const rangeOverlap=editingSpecial.downMin<s.downMax&&editingSpecial.downMax>s.downMin;
+      return modelMatch&&rangeOverlap;
+    });
+    if(overlaps.length>0){
+      const list=overlaps.map(s=>`- ${s.model} ดาวน์ ${s.downMin}-${s.downMax}%`).join("\n");
+      if(!confirm(`⚠️ ช่วงดาวน์ทับกับรายการที่มีอยู่แล้ว:\n${list}\n\nระบบจะเลือกให้อัตโนมัติตามงวดที่ตรงและช่วงดาวน์ที่แคบกว่า\nต้องการบันทึกรายการนี้ต่อไปหรือไม่?`)){
+        return;
+      }
+    }
     setPromos(prev=>{
-      const updated={...prev};
-      if(!updated[activePromo])updated[activePromo]={...DEFAULT_PROMOTION};
-      if(!updated[activePromo][editingMode])updated[activePromo][editingMode]={default:[],special:[]};
-      updated[activePromo][editingMode]={
-        ...updated[activePromo][editingMode],
-        special:[...(updated[activePromo][editingMode].special||[]),editingSpecial]
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const curMode=curPromo[editingMode]||{default:[],special:[]};
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          [editingMode]:{
+            ...curMode,
+            special:[...(curMode.special||[]),editingSpecial]
+          }
+        }
       };
-      return updated;
     });
     setEditingSpecial(null);setEditingMode("");
   };
@@ -867,11 +912,17 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const deleteSpecialRate=(mode,index)=>{
     if(!confirm("ต้องการลบอัตราพิเศษนี้?"))return;
     setPromos(prev=>{
-      const updated={...prev};
-      const newSpecial=[...updated[activePromo][mode].special];
+      const curPromo=prev[activePromo];
+      const curMode=curPromo[mode];
+      const newSpecial=[...curMode.special];
       newSpecial.splice(index,1);
-      updated[activePromo][mode]={...updated[activePromo][mode],special:newSpecial};
-      return updated;
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          [mode]:{...curMode,special:newSpecial}
+        }
+      };
     });
   };
 
@@ -1062,15 +1113,24 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                   {modeData.special.length>0&&(
                     <div className="pt-2 border-t border-neutral-200">
                       <div className="text-xs font-semibold text-neutral-700 mb-2">อัตราพิเศษ ({modeData.special.length} รายการ)</div>
-                      {modeData.special.map((spec,idx)=>(
-                        <div key={idx} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mb-1">
-                          <div className="text-xs">
-                            <div className="font-semibold text-neutral-900">{spec.model}</div>
-                            <div className="text-neutral-600">ดาวน์ {spec.downMin}–{spec.downMax}% → {spec.rate}%</div>
+                      {modeData.special.map((spec,idx)=>{
+                        const isLegacy=!spec.rates;
+                        const rateText=isLegacy
+                          ?`${spec.rate}% (ทุกงวด)`
+                          :([36,48,60,72,84].filter(t=>typeof spec.rates[t]==='number').map(t=>`${t}ด.=${spec.rates[t]}%`).join(', ')||'ยังไม่ระบุเรท');
+                        return(
+                          <div key={idx} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mb-1">
+                            <div className="text-xs">
+                              <div className="font-semibold text-neutral-900 flex items-center gap-1">
+                                {spec.model}
+                                {isLegacy&&<span className="text-amber-600" title="ยังไม่ได้ระบุงวด">⚠️ ยังไม่ได้ระบุงวด</span>}
+                              </div>
+                              <div className="text-neutral-600">ดาวน์ {spec.downMin}–{spec.downMax}% → {rateText}</div>
+                            </div>
+                            <button onClick={()=>deleteSpecialRate(modeKey,idx)} className="rounded-lg p-1.5 hover:bg-red-100 text-red-600 transition-colors"><Trash2 size={16}/></button>
                           </div>
-                          <button onClick={()=>deleteSpecialRate(modeKey,idx)} className="rounded-lg p-1.5 hover:bg-red-100 text-red-600 transition-colors"><Trash2 size={16}/></button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   <button onClick={()=>addSpecialRate(modeKey)}
@@ -1104,8 +1164,22 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">อัตราดอกเบี้ย (%)</label>
-                <input type="number" step="0.01" value={editingSpecial.rate} onChange={e=>setEditingSpecial({...editingSpecial,rate:Number(e.target.value)})} className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4]"/>
+                <label className="block text-sm font-semibold text-neutral-700 mb-1">อัตราดอกเบี้ยตามงวด (%) — เว้นว่างได้</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[36,48,60,72,84].map(t=>(
+                    <div key={t}>
+                      <label className="block text-[10px] text-neutral-500 text-center mb-0.5">{t} ด.</label>
+                      <input type="number" step="0.01"
+                        value={editingSpecial.rates?.[t]??""}
+                        onChange={e=>{
+                          const v=e.target.value;
+                          setEditingSpecial({...editingSpecial,rates:{...(editingSpecial.rates||{}),[t]:v===""?null:Number(v)}});
+                        }}
+                        placeholder="-"
+                        className="w-full rounded-lg border border-neutral-300 px-1 py-2 text-xs text-center text-neutral-900 focus:border-[#1c69d4]"/>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-6">
