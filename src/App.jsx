@@ -136,29 +136,40 @@ const migratePromotion = (promo) => {
   return migrated;
 };
 
-const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
+const getRateForPromotion = (mode, carModel, downPct, term, promotionData, financeAmt) => {
   if (!promotionData || !promotionData[mode]) return null;
   const migratedPromo = migratePromotion(promotionData);
   const modeData = migratedPromo[mode];
   const termNum = Number(term) || 60;
 
+  const rankSpecial = (a, b) => {
+    const aHasTermRate = (a.rates && typeof a.rates[termNum] === 'number') ? 1 : 0;
+    const bHasTermRate = (b.rates && typeof b.rates[termNum] === 'number') ? 1 : 0;
+    if (aHasTermRate !== bHasTermRate) return bHasTermRate - aHasTermRate;
+    return (a.downMax - a.downMin) - (b.downMax - b.downMin);
+  };
+
+  let exceededMaxFinance = null;
+
   // 1. Special Rates (fuzzy match ชื่อรถ) — เก็บทุกรายการที่เข้าเกณฑ์ แล้วจัดลำดับความสำคัญ
   // เพื่อไม่ให้ลำดับในอาร์เรย์เป็นตัวตัดสินแบบเงียบๆ (เคยเป็นบั๊กตอนใช้ .find())
   if (modeData.special && modeData.special.length > 0) {
-    const candidates = modeData.special.filter(s => {
+    // ชุดที่ยังไม่กรองเพดานยอดจัด — ใช้แยกแยะ "ไม่มีอัตราพิเศษเลย" กับ "มีแต่เกินเพดาน"
+    const candidatesAll = modeData.special.filter(s => {
       const modelLower = carModel.toLowerCase().trim();
       const specModelLower = s.model.toLowerCase().trim();
       const modelMatch = modelLower.includes(specModelLower) || specModelLower.includes(modelLower);
       const hasRateForTerm = (s.rates && typeof s.rates[termNum] === 'number') || typeof s.rate === 'number';
       return modelMatch && downPct >= s.downMin && downPct < s.downMax && hasRateForTerm;
     });
+    const candidates = candidatesAll.filter(s =>
+      !(typeof s.maxFinance === 'number' && s.maxFinance > 0) ||
+      typeof financeAmt !== 'number' ||
+      financeAmt <= s.maxFinance
+    );
+
     if (candidates.length > 0) {
-      const ranked = [...candidates].sort((a, b) => {
-        const aHasTermRate = (a.rates && typeof a.rates[termNum] === 'number') ? 1 : 0;
-        const bHasTermRate = (b.rates && typeof b.rates[termNum] === 'number') ? 1 : 0;
-        if (aHasTermRate !== bHasTermRate) return bHasTermRate - aHasTermRate;
-        return (a.downMax - a.downMin) - (b.downMax - b.downMin);
-      });
+      const ranked = [...candidates].sort(rankSpecial);
       const special = ranked[0];
       const hasTermRate = special.rates && typeof special.rates[termNum] === 'number';
       return {
@@ -167,6 +178,11 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
         source: `${special.model} + Down ${special.downMin}-${special.downMax}%`,
         ...(hasTermRate ? {} : { isLegacy: true })
       };
+    }
+    if (candidatesAll.length > 0) {
+      // มีอัตราพิเศษที่ตรงเกณฑ์ทุกอย่าง แต่ยอดจัดเกินเพดานของทุกรายการ — fall back ไปอัตราพื้นฐาน พร้อมแจ้งเตือน
+      const nearest = [...candidatesAll].sort(rankSpecial)[0];
+      exceededMaxFinance = { model: nearest.model, maxFinance: nearest.maxFinance };
     }
   }
 
@@ -179,7 +195,8 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
       return {
         rate: tier.rate,
         type: 'default',
-        source: `Down ${tier.min === 0 && tier.max < 20 ? `< ${tier.max + 1}` : `${tier.min}-${tier.max}`}% · ${termNum} เดือน`
+        source: `Down ${tier.min === 0 && tier.max < 20 ? `< ${tier.max + 1}` : `${tier.min}-${tier.max}`}% · ${termNum} เดือน`,
+        ...(exceededMaxFinance ? { exceededMaxFinance } : {})
       };
     }
     // 3. fallback — match เฉพาะ down%
@@ -188,11 +205,17 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData) => {
       return {
         rate: tierByDown.rate,
         type: 'default',
-        source: `Down ${tierByDown.min === 0 && tierByDown.max < 20 ? `< ${tierByDown.max + 1}` : `${tierByDown.min}-${tierByDown.max}`}% (fallback)`
+        source: `Down ${tierByDown.min === 0 && tierByDown.max < 20 ? `< ${tierByDown.max + 1}` : `${tierByDown.min}-${tierByDown.max}`}% (fallback)`,
+        ...(exceededMaxFinance ? { exceededMaxFinance } : {})
       };
     }
     const middleTier = modeData.default[Math.floor(modeData.default.length / 2)];
-    return { rate: middleTier.rate, type: 'default', source: 'Default (out of range)' };
+    return {
+      rate: middleTier.rate,
+      type: 'default',
+      source: 'Default (out of range)',
+      ...(exceededMaxFinance ? { exceededMaxFinance } : {})
+    };
   }
   return null;
 };
@@ -762,6 +785,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const[activePromo,setActivePromo]=useState(currentPromoId);
   const[editingMode,setEditingMode]=useState("");
   const[editingSpecial,setEditingSpecial]=useState(null);
+  const[editingSpecialIndex,setEditingSpecialIndex]=useState(null); // null = เพิ่มใหม่, number = แก้ไขตำแหน่งนี้
   const[editingTier,setEditingTier]=useState(null);
   const[addingMonth,setAddingMonth]=useState(false);
   const[newMonthName,setNewMonthName]=useState("");
@@ -867,7 +891,26 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     });
   };
 
-  const addSpecialRate=(mode)=>{setEditingMode(mode);setEditingSpecial({model:"",downMin:20,downMax:35,rates:{36:null,48:null,60:null,72:null,84:null}});};
+  const addSpecialRate=(mode)=>{
+    setEditingMode(mode);
+    setEditingSpecialIndex(null);
+    setEditingSpecial({model:"",downMin:20,downMax:35,rates:{36:null,48:null,60:null,72:null,84:null},maxFinance:null});
+  };
+
+  const editSpecialRate=(mode,index)=>{
+    const spec=promos[activePromo]?.[mode]?.special?.[index];
+    if(!spec)return;
+    setEditingMode(mode);
+    setEditingSpecialIndex(index);
+    setEditingSpecial({
+      model:spec.model,
+      downMin:spec.downMin,
+      downMax:spec.downMax,
+      rates:spec.rates?{...spec.rates}:{36:null,48:null,60:null,72:null,84:null},
+      legacyRate:spec.rates?undefined:spec.rate,
+      maxFinance:typeof spec.maxFinance==='number'?spec.maxFinance:null
+    });
+  };
 
   const saveSpecialRate=()=>{
     const hasAnyRate=Object.values(editingSpecial?.rates||{}).some(v=>typeof v==='number');
@@ -878,7 +921,12 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
     if(editingSpecial.downMin<0||editingSpecial.downMax>100||editingSpecial.downMin>=editingSpecial.downMax){
       alert("❌ ช่วงเงินดาวน์ไม่ถูกต้อง");return;
     }
-    const existingSpecial=promos[activePromo]?.[editingMode]?.special||[];
+    if(editingSpecial.maxFinance!=null&&(isNaN(editingSpecial.maxFinance)||editingSpecial.maxFinance<=0)){
+      alert("❌ เพดานยอดจัดต้องเป็นตัวเลขมากกว่า 0 (หรือเว้นว่างถ้าไม่จำกัด)");return;
+    }
+    // ไม่เทียบกับรายการที่กำลังแก้ไขอยู่เอง ไม่งั้นจะเตือนว่าทับกับตัวเอง
+    const existingSpecial=(promos[activePromo]?.[editingMode]?.special||[])
+      .filter((_,i)=>i!==editingSpecialIndex);
     const modelLower=editingSpecial.model.toLowerCase().trim();
     const overlaps=existingSpecial.filter(s=>{
       const specModelLower=s.model.toLowerCase().trim();
@@ -892,21 +940,29 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
         return;
       }
     }
+    const cleanSpecial={model:editingSpecial.model,downMin:editingSpecial.downMin,downMax:editingSpecial.downMax,rates:editingSpecial.rates};
+    if(typeof editingSpecial.maxFinance==='number'&&editingSpecial.maxFinance>0){
+      cleanSpecial.maxFinance=editingSpecial.maxFinance;
+    }
     setPromos(prev=>{
       const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
       const curMode=curPromo[editingMode]||{default:[],special:[]};
+      const prevSpecial=curMode.special||[];
+      const newSpecial=editingSpecialIndex===null
+        ? [...prevSpecial,cleanSpecial]
+        : prevSpecial.map((s,i)=>i===editingSpecialIndex?cleanSpecial:s);
       return{
         ...prev,
         [activePromo]:{
           ...curPromo,
           [editingMode]:{
             ...curMode,
-            special:[...(curMode.special||[]),editingSpecial]
+            special:newSpecial
           }
         }
       };
     });
-    setEditingSpecial(null);setEditingMode("");
+    setEditingSpecial(null);setEditingMode("");setEditingSpecialIndex(null);
   };
 
   const deleteSpecialRate=(mode,index)=>{
@@ -1126,8 +1182,14 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                                 {isLegacy&&<span className="text-amber-600" title="ยังไม่ได้ระบุงวด">⚠️ ยังไม่ได้ระบุงวด</span>}
                               </div>
                               <div className="text-neutral-600">ดาวน์ {spec.downMin}–{spec.downMax}% → {rateText}</div>
+                              {typeof spec.maxFinance==='number'&&(
+                                <div className="text-neutral-500">เพดานยอดจัด ≤ {fmtB(spec.maxFinance)} บาท</div>
+                              )}
                             </div>
-                            <button onClick={()=>deleteSpecialRate(modeKey,idx)} className="rounded-lg p-1.5 hover:bg-red-100 text-red-600 transition-colors"><Trash2 size={16}/></button>
+                            <div className="flex items-center gap-1">
+                              <button onClick={()=>editSpecialRate(modeKey,idx)} className="rounded-lg p-1.5 hover:bg-amber-100 text-amber-700 transition-colors"><Edit2 size={16}/></button>
+                              <button onClick={()=>deleteSpecialRate(modeKey,idx)} className="rounded-lg p-1.5 hover:bg-red-100 text-red-600 transition-colors"><Trash2 size={16}/></button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1144,9 +1206,9 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
         </div>
       </div>
       {editingSpecial&&(
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={()=>setEditingSpecial(null)}>
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={()=>{setEditingSpecial(null);setEditingSpecialIndex(null);}}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={e=>e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-neutral-900 mb-4">เพิ่มอัตราพิเศษ — {MODES[editingMode]?.label}</h3>
+            <h3 className="text-lg font-bold text-neutral-900 mb-4">{editingSpecialIndex===null?"เพิ่ม":"แก้ไข"}อัตราพิเศษ — {MODES[editingMode]?.label}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-semibold text-neutral-700 mb-1">รุ่นรถ (บางส่วนของชื่อ)</label>
@@ -1165,6 +1227,11 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
               </div>
               <div>
                 <label className="block text-sm font-semibold text-neutral-700 mb-1">อัตราดอกเบี้ยตามงวด (%) — เว้นว่างได้</label>
+                {editingSpecial.legacyRate!=null&&(
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 mb-1.5">
+                    เดิมใช้ {editingSpecial.legacyRate}% ทุกงวด — กรุณากรอกเรทตามงวดใหม่
+                  </p>
+                )}
                 <div className="grid grid-cols-5 gap-1.5">
                   {[36,48,60,72,84].map(t=>(
                     <div key={t}>
@@ -1181,10 +1248,22 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-1">เพดานยอดจัด (บาท)</label>
+                <input type="number" min="0" step="1"
+                  value={editingSpecial.maxFinance??""}
+                  onChange={e=>{
+                    const v=e.target.value;
+                    setEditingSpecial({...editingSpecial,maxFinance:v===""?null:Number(v)});
+                  }}
+                  placeholder="ไม่จำกัด"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-[#1c69d4]"/>
+                <p className="text-[11px] text-neutral-500 mt-1">เว้นว่าง = ไม่มีเพดาน ใช้ได้ทุกยอดจัด</p>
+              </div>
             </div>
             <div className="flex gap-2 mt-6">
-              <button onClick={()=>setEditingSpecial(null)} className="flex-1 rounded-lg border-2 border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">ยกเลิก</button>
-              <button onClick={saveSpecialRate} className="flex-1 rounded-lg border-2 border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">บันทึก</button>
+              <button onClick={()=>{setEditingSpecial(null);setEditingSpecialIndex(null);}} className="flex-1 rounded-lg border-2 border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">ยกเลิก</button>
+              <button onClick={saveSpecialRate} className="flex-1 rounded-lg border-2 border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">{editingSpecialIndex===null?"เพิ่ม":"บันทึกการแก้ไข"}</button>
             </div>
           </div>
         </div>
@@ -2037,13 +2116,16 @@ export default function App(){
         ? Number(v)
         : (Number(inputs.downPct)||Number(inputs.depositPct)||0);
       const term=k==='term' ? Number(v) : (Number(inputs.term)||60);
-      autoFillRate(mode,carModel,downPct,term);
+      // สร้าง inputs ชั่วคราวโดยแทนค่าที่กำลังจะเปลี่ยนเข้าไป เพราะ inputs state ยังไม่ sync ณ จังหวะนี้
+      const tempInputs={...inputs,[k]:v};
+      const financeAmt=calcWithBsi(mode,tempInputs,discount).finance;
+      autoFillRate(mode,carModel,downPct,term,financeAmt);
     }
   };
 
-  const autoFillRate=(currentMode,currentCarModel,downPct,term)=>{
+  const autoFillRate=(currentMode,currentCarModel,downPct,term,financeAmt)=>{
     if(!currentPromoId || !promotions[currentPromoId])return;
-    const rateInfo=getRateForPromotion(currentMode,currentCarModel,downPct,term,promotions[currentPromoId]);
+    const rateInfo=getRateForPromotion(currentMode,currentCarModel,downPct,term,promotions[currentPromoId],financeAmt);
     if(rateInfo){
       setAutoFilledRate(rateInfo);
       if(currentMode==="HP"){
@@ -2064,7 +2146,8 @@ export default function App(){
     }
     const downPct=MODES[mode].hasDeposit ? (Number(inputs.depositPct)||25) : (Number(inputs.downPct)||25);
     const term=Number(inputs.term)||60;
-    autoFillRate(mode,carModel,downPct,term);
+    const financeAmt=calcWithBsi(mode,inputs,discount).finance;
+    autoFillRate(mode,carModel,downPct,term,financeAmt);
   },[mode,carModel,currentPromoId,promotions,inputs.downPct,inputs.term]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const result=useMemo(()=>calcWithBsi(mode,inputs,discount),[mode,inputs,discount]);
@@ -2083,7 +2166,8 @@ export default function App(){
     if(carModel && currentPromoId && promotions[currentPromoId]){
       const downPct=MODES[newMode].hasDeposit?(Number(base.depositPct)||25):(Number(base.downPct)||25);
       const term=Number(base.term)||60;
-      const rateInfo=getRateForPromotion(newMode,carModel,downPct,term,promotions[currentPromoId]);
+      const financeAmt=calcWithBsi(newMode,base,discount).finance;
+      const rateInfo=getRateForPromotion(newMode,carModel,downPct,term,promotions[currentPromoId],financeAmt);
       if(rateInfo){
         setAutoFilledRate(rateInfo);
         rateOverride=newMode==="HP"?{sfFlatRate:rateInfo.rate}:{sfEffRate:rateInfo.rate};
@@ -2102,7 +2186,8 @@ export default function App(){
       // Auto-fill rate
       const downPct=MODES[mode].hasDeposit ? (Number(prev.depositPct) || 25) : (Number(prev.downPct) || 25);
       const term=Number(prev.term)||60;
-      setTimeout(()=>autoFillRate(mode,car.model,downPct,term),0);
+      const financeAmt=calcWithBsi(mode,newInputs,discount).finance;
+      setTimeout(()=>autoFillRate(mode,car.model,downPct,term,financeAmt),0);
       
       return newInputs;
     });
@@ -2333,6 +2418,11 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                   <div><div className="text-[10px] text-neutral-400">ยอดจัด</div><div className="text-sm font-semibold tabular-nums">{fmtB(result.finance)}</div></div>
                   <div><div className="text-[10px] text-neutral-400">ดาวน์</div><div className="text-sm font-semibold tabular-nums">{fmtB(m.hasDeposit?result.depositAmt:result.downAmt)}</div></div>
                 </div>
+                {autoFilledRate?.exceededMaxFinance&&(
+                  <div className="mt-3 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
+                    ⚠️ ยอดจัด {fmtB(result.finance)} เกินเพดานอัตราพิเศษ {fmtB(autoFilledRate.exceededMaxFinance.maxFinance)} — ใช้อัตราพื้นฐานแทน
+                  </div>
+                )}
               </>
             )}
           </div>
