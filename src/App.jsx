@@ -2363,19 +2363,6 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
 
       {/* MAIN */}
       <main className="mx-auto max-w-md px-4 pb-32 pt-4 space-y-4">
-        
-        {/* Customer Info */}
-        <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-            <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>ข้อมูลลูกค้า
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input type="text" value={customerName} onChange={e=>setCustomerName(e.target.value)}
-              placeholder="ชื่อลูกค้า" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
-            <input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
-              placeholder="เบอร์โทร" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
-          </div>
-        </div>
 
         {/* Car Selection */}
         <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
@@ -2733,6 +2720,19 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
           </div>
         )}
         
+        {/* Customer Info */}
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+            <div className="h-1 w-1 rounded-full bg-[#1c69d4]"/>ข้อมูลลูกค้า
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" value={customerName} onChange={e=>setCustomerName(e.target.value)}
+              placeholder="ชื่อลูกค้า" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
+            <input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
+              placeholder="เบอร์โทร" className="rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#1c69d4]"/>
+          </div>
+        </div>
+
         {/* SUMMARY BUTTON */}
         {result.monthly>0&&(
           <>
