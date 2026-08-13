@@ -2418,9 +2418,18 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                   <div><div className="text-[10px] text-neutral-400">ยอดจัด</div><div className="text-sm font-semibold tabular-nums">{fmtB(result.finance)}</div></div>
                   <div><div className="text-[10px] text-neutral-400">ดาวน์</div><div className="text-sm font-semibold tabular-nums">{fmtB(m.hasDeposit?result.depositAmt:result.downAmt)}</div></div>
                 </div>
-                {autoFilledRate?.exceededMaxFinance&&(
-                  <div className="mt-3 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
-                    ⚠️ ยอดจัด {fmtB(result.finance)} เกินเพดานอัตราพิเศษ {fmtB(autoFilledRate.exceededMaxFinance.maxFinance)} — ใช้อัตราพื้นฐานแทน
+                {(autoFilledRate?.exceededMaxFinance||result.term>60)&&(
+                  <div className="mt-3 space-y-2">
+                    {autoFilledRate?.exceededMaxFinance&&(
+                      <div className="rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
+                        ⚠️ ยอดจัด {fmtB(result.finance)} เกินเพดานอัตราพิเศษ {fmtB(autoFilledRate.exceededMaxFinance.maxFinance)} — ใช้อัตราพื้นฐานแทน
+                      </div>
+                    )}
+                    {result.term>60&&(
+                      <div className="rounded-lg border border-orange-400/40 bg-orange-500/15 px-3 py-2 text-xs text-orange-200">
+                        ⚠️ {result.term} งวด เกินเงื่อนไข BMW Leasing (สูงสุด 60 งวด) — ต้องใช้ไฟแนนซ์นอก เรทคนละชุด
+                      </div>
+                    )}
                   </div>
                 )}
               </>
