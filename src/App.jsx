@@ -26,7 +26,7 @@ const saveToCloud = async (key, value) => {
   }
 };
 
-const APP_VERSION = "2.11.5";
+const APP_VERSION = "2.12.0";
 
 // ============ DEFAULT FREEBIES ============
 const DEFAULT_FREEBIES = [
