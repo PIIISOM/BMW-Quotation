@@ -1968,8 +1968,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
       }
     }
     const r=calcWithBsi(mode,rateInputs,discount||0);
-    const rateUsed=mode==="HP"?Number(rateInputs.sfFlatRate):Number(rateInputs.sfEffRate);
-    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:rateUsed};
+    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:r.custFlatRate};
   });
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
@@ -2044,7 +2043,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
                 <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
                   <td className="px-3 py-3 font-semibold text-neutral-700">{pct}%</td>
                   <td className="px-3 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
-                  {showRate&&<td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{(rate||0).toFixed(2)}%</td>}
+                  {showRate&&<td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{fmtP(rate)}</td>}
                   <td className="px-3 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
                 </tr>
               ))}
