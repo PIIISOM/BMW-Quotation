@@ -220,6 +220,19 @@ const getRateForPromotion = (mode, carModel, downPct, term, promotionData, finan
   return null;
 };
 
+// หาช่วง min/max ของ Balloon % ตามกลุ่มรถ + งวด จากตาราง balloonTable ของโปรโมชั่น
+// ว่าง/ไม่มีข้อมูล = ไม่ระบุ (คืนค่า null ให้ field นั้น ไม่ใช่ 0)
+const getBalloonCapEntry = (balloonGroup, term, promotionData) => {
+  if (!promotionData || !balloonGroup) return null;
+  const termNum = Number(term) || 60;
+  const entry = promotionData.balloonTable?.[balloonGroup]?.[termNum];
+  if (!entry) return null;
+  const min = typeof entry.min === 'number' ? entry.min : null;
+  const max = typeof entry.max === 'number' ? entry.max : null;
+  if (min === null && max === null) return null;
+  return { min, max };
+};
+
 // ============ CAR DATABASE ============
 const DEFAULT_CAR_DB = [
   { model: "2 - 220 Gran Coupe M Sport Pro", retail: 2079000, bsiStd: 2199000, bsiUlt: 2319000, bsiPkg: 120000, gfv: 1247400 },
@@ -254,6 +267,9 @@ const DEFAULT_CAR_DB = [
   { model: "X6 - X6 xDrive40i M Sport", retail: 5769000, bsiStd: 5959000, bsiUlt: 6159000, bsiPkg: 200000, gfv: 2569050 },
   { model: "X7 - X7 xDrive40d M Sport", retail: 6469000, bsiStd: 6659000, bsiUlt: 6859000, bsiPkg: 200000, gfv: 2911050 },
 ];
+
+// รายชื่อกลุ่มบอลลูน — ไม่มีค่า/undefined บน car.balloonGroup แปลว่ายังไม่ระบุ
+const DEFAULT_BALLOON_GROUPS = ["G20", "X1-U11", "Non-BEV", "BEV", "M", "iX3"];
 
 // ============ FINANCIAL FUNCTIONS ============
 const PMT = (rate, nper, pv, fv = 0) => {
@@ -500,7 +516,8 @@ function StatRow({label,value,accent}){
 }
 
 // ============ CAR MANAGER ============
-function CarManager({carDB,onSave,onClose,onBack}){
+function CarManager({carDB,onSave,onClose,onBack,balloonGroups}){
+  const groupOptions=balloonGroups||DEFAULT_BALLOON_GROUPS;
   const[cars,setCars]=useState([...carDB]);
   const[editing,setEditing]=useState(null);
   
@@ -580,6 +597,17 @@ function CarManager({carDB,onSave,onClose,onBack}){
                       <input type="number" value={c.gfv} onChange={e=>{const n=[...cars]; n[i].gfv=Number(e.target.value)||0; setCars(n);}}
                         className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"/>
                     </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1 block">กลุ่มบอลลูน</label>
+                      <select value={c.balloonGroup||""} onChange={e=>{
+                          const v=e.target.value;
+                          setCars(cars.map((car,idx)=>idx===i?{...car,balloonGroup:v||undefined}:car));
+                        }}
+                        className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm bg-white">
+                        <option value="">ยังไม่ระบุ</option>
+                        {groupOptions.map(g=><option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={()=>setEditing(null)} className="flex-1 rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium hover:bg-neutral-200">เสร็จ</button>
@@ -589,7 +617,12 @@ function CarManager({carDB,onSave,onClose,onBack}){
               ):(
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="text-sm font-semibold text-neutral-900 mb-2">{c.model||"(ยังไม่ตั้งชื่อ)"}</div>
+                    <div className="text-sm font-semibold text-neutral-900 mb-2 flex items-center gap-2">
+                      <span>{c.model||"(ยังไม่ตั้งชื่อ)"}</span>
+                      {c.balloonGroup
+                        ?<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-neutral-100 text-neutral-600">{c.balloonGroup}</span>
+                        :<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">⚠️ ไม่ระบุกลุ่ม</span>}
+                    </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
                       <div className="flex justify-between"><span className="text-neutral-500">Retail:</span><span className="font-medium tabular-nums">{fmtB(c.retail)}</span></div>
                       <div className="flex justify-between"><span className="text-neutral-500">BSI Std:</span><span className="font-medium tabular-nums">{fmtB(c.bsiStd)}</span></div>
@@ -608,6 +641,76 @@ function CarManager({carDB,onSave,onClose,onBack}){
           <button onClick={addNew} className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-300 py-2.5 text-sm text-neutral-600 hover:border-[#1c69d4] hover:text-[#1c69d4]">
             <Plus size={16}/>เพิ่มรุ่นใหม่
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============ BALLOON GROUP MANAGER ============
+function BalloonGroupManager({carDB,onSave,onClose,onBack,balloonGroups}){
+  const groupOptions=balloonGroups||DEFAULT_BALLOON_GROUPS;
+  const[cars,setCars]=useState(()=>carDB.map(c=>({...c})));
+
+  const setGroup=(idx,value)=>{
+    setCars(prev=>prev.map((c,i)=>i===idx?{...c,balloonGroup:value||undefined}:c));
+  };
+
+  const rows=useMemo(()=>{
+    return cars
+      .map((car,idx)=>({car,idx}))
+      .sort((a,b)=>{
+        const aUnassigned=a.car.balloonGroup?0:1;
+        const bUnassigned=b.car.balloonGroup?0:1;
+        if(aUnassigned!==bUnassigned)return bUnassigned-aUnassigned;
+        return a.car.model.localeCompare(b.car.model,'th');
+      });
+  },[cars]);
+
+  const unassignedCount=cars.filter(c=>!c.balloonGroup).length;
+
+  const save=()=>{
+    onSave(cars);
+    if(onBack)onBack();
+    else onClose();
+  };
+
+  return(
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end" onClick={onClose}>
+      <div className="w-full max-w-2xl mx-auto bg-white rounded-t-2xl max-h-[90vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
+          {onBack&&(
+            <button onClick={save} className="rounded-full p-1.5 hover:bg-neutral-100" title="กลับ">
+              <ChevronRight size={18} className="rotate-180"/>
+            </button>
+          )}
+          <h3 className="text-sm font-bold text-neutral-900">ติดป้ายกลุ่มบอลลูน</h3>
+          <div className="flex gap-2">
+            <button onClick={save} className="rounded-lg border-2 border-neutral-200 bg-white text-neutral-700 px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50">บันทึก</button>
+            <button onClick={onClose} className="rounded-full p-1.5 hover:bg-neutral-100"><X size={16}/></button>
+          </div>
+        </div>
+        <div className="px-4 pt-3 text-xs text-neutral-500">
+          {unassignedCount>0?`⚠️ ยังไม่ระบุกลุ่ม ${unassignedCount} คัน`:"ระบุกลุ่มครบทุกคันแล้ว ✓"}
+        </div>
+        <div className="overflow-auto flex-1 p-4 space-y-2">
+          {rows.map(({car,idx})=>{
+            const unassigned=!car.balloonGroup;
+            return(
+              <div key={idx} className={`flex items-center justify-between gap-3 border rounded-lg p-3 ${unassigned?"border-orange-300 bg-orange-50":"border-neutral-200"}`}>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium truncate ${unassigned?"text-orange-900":"text-neutral-900"}`}>
+                    {unassigned&&"⚠️ "}{car.model}
+                  </div>
+                </div>
+                <select value={car.balloonGroup||""} onChange={e=>setGroup(idx,e.target.value)}
+                  className={`rounded-lg border px-2 py-1.5 text-sm ${unassigned?"border-orange-300 bg-white text-orange-900":"border-neutral-200 bg-white"}`}>
+                  <option value="">ยังไม่ระบุ</option>
+                  {groupOptions.map(g=><option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -776,7 +879,7 @@ function FreebieManager({items,onSave,onClose,onBack}){
 }
 
 // ============ PROMOTION MANAGER ============
-function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
+function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB,onUpdateCarBalloonGroups}){
   const[promos,setPromos]=useState(()=>{
     const migrated={};
     Object.keys(promotions).forEach(id=>{migrated[id]=migratePromotion(promotions[id]);});
@@ -795,6 +898,81 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
   const currentPromo=promos[activePromo]||{...DEFAULT_PROMOTION};
   const activeTerms=(currentPromo.terms||[48,60]).map(Number).sort((a,b)=>a-b);
   const AVAILABLE_TERMS=[48,60,72,84];
+  const balloonGroups=currentPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+
+  const updateBalloonCap=(group,term,field,value)=>{
+    setPromos(prev=>{
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const curTable=curPromo.balloonTable||{};
+      const curGroupTable=curTable[group]||{};
+      const curTermEntry=curGroupTable[term]||{};
+      return{
+        ...prev,
+        [activePromo]:{
+          ...curPromo,
+          balloonTable:{
+            ...curTable,
+            [group]:{
+              ...curGroupTable,
+              [term]:{
+                ...curTermEntry,
+                [field]:value===""?null:Number(value)
+              }
+            }
+          }
+        }
+      };
+    });
+  };
+
+  const addBalloonGroup=()=>{
+    const name=(prompt("ชื่อกลุ่มบอลลูนใหม่")||"").trim();
+    if(!name)return;
+    setPromos(prev=>{
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const curGroups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+      if(curGroups.includes(name)){alert("❌ มีกลุ่มนี้อยู่แล้ว");return prev;}
+      return{...prev,[activePromo]:{...curPromo,balloonGroups:[...curGroups,name]}};
+    });
+  };
+
+  const renameBalloonGroup=(oldName)=>{
+    const newName=(prompt("เปลี่ยนชื่อกลุ่มบอลลูน",oldName)||"").trim();
+    if(!newName||newName===oldName)return;
+    const curGroups=currentPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+    if(curGroups.includes(newName)){alert("❌ มีกลุ่มชื่อนี้อยู่แล้ว");return;}
+    setPromos(prev=>{
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const groups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+      const newGroups=groups.map(g=>g===oldName?newName:g);
+      const table=curPromo.balloonTable||{};
+      const newTable={...table};
+      if(newTable[oldName]!==undefined){
+        newTable[newName]=newTable[oldName];
+        delete newTable[oldName];
+      }
+      return{...prev,[activePromo]:{...curPromo,balloonGroups:newGroups,balloonTable:newTable}};
+    });
+    onUpdateCarBalloonGroups?.(oldName,newName);
+  };
+
+  const deleteBalloonGroup=(name)=>{
+    const affectedCount=(carDB||[]).filter(c=>c.balloonGroup===name).length;
+    const msg=affectedCount>0
+      ?`⚠️ มีรถ ${affectedCount} คันใช้กลุ่ม "${name}" อยู่\nถ้าลบ รถกลุ่มนี้จะกลายเป็น "ยังไม่ระบุกลุ่ม"\n\nต้องการลบกลุ่มนี้ต่อไปหรือไม่?`
+      :`ต้องการลบกลุ่ม "${name}" ใช่ไหม?`;
+    if(!confirm(msg))return;
+    setPromos(prev=>{
+      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
+      const groups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+      const newGroups=groups.filter(g=>g!==name);
+      const table=curPromo.balloonTable||{};
+      const newTable={...table};
+      delete newTable[name];
+      return{...prev,[activePromo]:{...curPromo,balloonGroups:newGroups,balloonTable:newTable}};
+    });
+    if(affectedCount>0) onUpdateCarBalloonGroups?.(name,null);
+  };
 
   const toggleTerm=(term)=>{
     setPromos(prev=>{
@@ -1100,6 +1278,70 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
               </button>
             </div>
           </div>
+          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-neutral-600">🎈 อัตราบอลลูน (ตามกลุ่มรถ)</span>
+              <button onClick={addBalloonGroup} className="text-[11px] font-semibold text-[#1c69d4] hover:underline flex items-center gap-0.5">
+                <Plus size={12}/>เพิ่มกลุ่ม
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left py-1.5 px-2 text-neutral-500 font-medium bg-neutral-100 rounded-tl-lg">กลุ่ม</th>
+                    {activeTerms.map(t=>(
+                      <th key={t} colSpan={2} className="text-center py-1.5 px-2 text-neutral-500 font-medium bg-neutral-100 border-l border-neutral-200">{t} เดือน</th>
+                    ))}
+                    <th className="bg-neutral-100 rounded-tr-lg w-8"></th>
+                  </tr>
+                  <tr>
+                    <th className="bg-neutral-50"></th>
+                    {activeTerms.flatMap(t=>[
+                      <th key={`${t}-min`} className="text-center py-1 px-1 text-neutral-400 font-normal bg-neutral-50 border-l border-neutral-200">ขั้นต่ำ</th>,
+                      <th key={`${t}-max`} className="text-center py-1 px-1 text-neutral-400 font-normal bg-neutral-50">เพดาน</th>
+                    ])}
+                    <th className="bg-neutral-50"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balloonGroups.map(group=>(
+                    <tr key={group} className="border-t border-neutral-200">
+                      <td className="py-1.5 px-2 font-semibold text-neutral-700 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span>{group}</span>
+                          <button onClick={()=>renameBalloonGroup(group)} title="เปลี่ยนชื่อกลุ่ม" className="p-0.5 rounded hover:bg-neutral-200 text-neutral-400 hover:text-neutral-700"><Edit2 size={11}/></button>
+                        </div>
+                      </td>
+                      {activeTerms.flatMap(t=>{
+                        const entry=(currentPromo.balloonTable||{})[group]?.[t]||{};
+                        return[
+                          <td key={`${t}-min`} className="py-1 px-1 text-center border-l border-neutral-100">
+                            <input type="text" inputMode="decimal" placeholder="-"
+                              value={entry.min??""}
+                              onChange={e=>updateBalloonCap(group,t,'min',e.target.value)}
+                              className="w-14 rounded-md border border-neutral-200 px-1 py-1 text-xs text-center font-medium text-neutral-900 focus:border-[#1c69d4] focus:outline-none"/>
+                          </td>,
+                          <td key={`${t}-max`} className="py-1 px-1 text-center">
+                            <input type="text" inputMode="decimal" placeholder="-"
+                              value={entry.max??""}
+                              onChange={e=>updateBalloonCap(group,t,'max',e.target.value)}
+                              className="w-14 rounded-md border border-neutral-200 px-1 py-1 text-xs text-center font-medium text-neutral-900 focus:border-[#1c69d4] focus:outline-none"/>
+                          </td>
+                        ];
+                      })}
+                      <td className="py-1 px-1 text-center">
+                        <button onClick={()=>deleteBalloonGroup(group)} className="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                          <Trash2 size={13}/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-neutral-400 mt-2">เว้นว่าง = ไม่ระบุ (ใช้ได้ทุกค่าในงวดนั้น ไม่มีเพดาน/ขั้นต่ำ)</p>
+          </div>
           {["HP","HP-BL","FC","FL","FL-BL"].map(modeKey=>{
             const modeData=migratePromotion(currentPromo)[modeKey]||{default:[],special:[]};
             const m=MODES[modeKey];
@@ -1273,7 +1515,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack}){
 }
 
 
-function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoManager,onOpenFreebieManager,onExport,onImport}){
+function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenBalloonGroupManager,onOpenPromoManager,onOpenFreebieManager,onExport,onImport}){
   const[name,setName]=useState(salesName);
   const[showSubmenu,setShowSubmenu]=useState(null); // null | 'data' | 'backup'
   const fileInputRef=useRef(null);
@@ -1325,7 +1567,21 @@ function SettingsDialog({salesName,onSave,onClose,onOpenCarManager,onOpenPromoMa
               </div>
               <ChevronRight size={16} className="text-neutral-400"/>
             </button>
-            
+
+            <button onClick={onOpenBalloonGroupManager}
+              className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-orange-100 p-2">
+                  <span className="text-base">🎈</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-neutral-900">ติดป้ายกลุ่มบอลลูน</div>
+                  <div className="text-[11px] text-neutral-500">กำหนดกลุ่มบอลลูนให้แต่ละรุ่น</div>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-neutral-400"/>
+            </button>
+
             <button onClick={onOpenPromoManager}
               className="w-full flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors mb-2">
               <div className="flex items-center gap-3">
@@ -1819,6 +2075,7 @@ export default function App(){
   const[showSalesDetail,setShowSalesDetail]=useState(false);
   const[showSaved,setShowSaved]=useState(false);
   const[showCarManager,setShowCarManager]=useState(false);
+  const[showBalloonGroupManager,setShowBalloonGroupManager]=useState(false);
   const[showSettings,setShowSettings]=useState(false);
   const[showPromoManager,setShowPromoManager]=useState(false);
   const[showResetConfirm,setShowResetConfirm]=useState(false);
@@ -1994,7 +2251,14 @@ export default function App(){
     }
     catch{ showToast("บันทึกไม่สำเร็จ"); }
   };
-  
+
+  // เปลี่ยน/ลบชื่อกลุ่มบอลลูน แล้วอัปเดตป้ายของรถที่ใช้กลุ่มนั้นตามไปด้วย
+  // newName=null → รถกลุ่มนี้กลายเป็น "ยังไม่ระบุกลุ่ม" (ใช้ตอนลบกลุ่ม)
+  const updateCarBalloonGroups=(oldName,newName)=>{
+    const updated=carDB.map(c=>c.balloonGroup===oldName?{...c,balloonGroup:newName||undefined}:c);
+    saveCarDB(updated);
+  };
+
   const saveSalesName=name=>{
     try{ localStorage.setItem("salesName",name); setSalesName(name); showToast("บันทึกชื่อแล้ว ✓"); }
     catch{ showToast("บันทึกไม่สำเร็จ"); }
@@ -2110,7 +2374,13 @@ export default function App(){
   };
   
   const setField=(k,v)=>{
-    setInputs(prev=>({...prev,[k]:v}));
+    // เติมเพดาน Balloon % ให้พร้อมกับการ set field งวด ในจังหวะเดียวกัน ไม่ใช่แยก effect มาตามทีหลัง
+    let balloonOverride={};
+    if(k==='term' && (mode==='HP-BL'||mode==='FL-BL') && selectedCar?.balloonGroup && currentPromoId && promotions[currentPromoId]){
+      const capEntry=getBalloonCapEntry(selectedCar.balloonGroup,v,promotions[currentPromoId]);
+      if(capEntry && capEntry.max!=null) balloonOverride={balloonPct:capEntry.max};
+    }
+    setInputs(prev=>({...prev,[k]:v,...balloonOverride}));
     if((k==='downPct'||k==='depositPct'||k==='term') && currentPromoId && carModel){
       const downPct=k==='downPct'||k==='depositPct'
         ? Number(v)
@@ -2148,10 +2418,29 @@ export default function App(){
     const term=Number(inputs.term)||60;
     const financeAmt=calcWithBsi(mode,inputs,discount).finance;
     autoFillRate(mode,carModel,downPct,term,financeAmt);
+    if((mode==='HP-BL'||mode==='FL-BL') && selectedCar?.balloonGroup){
+      const capEntry=getBalloonCapEntry(selectedCar.balloonGroup,term,promotions[currentPromoId]);
+      if(capEntry && capEntry.max!=null) setInputs(prev=>({...prev,balloonPct:capEntry.max}));
+    }
   },[mode,carModel,currentPromoId,promotions,inputs.downPct,inputs.term]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const result=useMemo(()=>calcWithBsi(mode,inputs,discount),[mode,inputs,discount]);
   const m=MODES[mode];
+
+  // เตือนเรื่อง Balloon % เทียบกับตารางกลุ่มบอลลูน — เฉพาะ HP-BL / FL-BL เท่านั้น (FC ไม่เกี่ยว)
+  const balloonWarning=useMemo(()=>{
+    if(mode!=='HP-BL'&&mode!=='FL-BL')return null;
+    if(!selectedCar||!currentPromoId||!promotions[currentPromoId])return null;
+    if(!selectedCar.balloonGroup)return{noGroup:true};
+    const term=Number(inputs.term)||60;
+    const capEntry=getBalloonCapEntry(selectedCar.balloonGroup,term,promotions[currentPromoId]);
+    if(!capEntry)return{noTableData:true,group:selectedCar.balloonGroup};
+    const used=Number(inputs.balloonPct)||0;
+    const over=capEntry.max!=null&&used>capEntry.max?capEntry.max:null;
+    const under=capEntry.min!=null&&used<capEntry.min?capEntry.min:null;
+    if(over==null&&under==null)return null;
+    return{over,under};
+  },[mode,selectedCar,currentPromoId,promotions,inputs.term,inputs.balloonPct]);
   
   const switchMode=newMode=>{
     setMode(newMode);
@@ -2162,10 +2451,10 @@ export default function App(){
       accessory:inputs.accessory||0,
       ...(selectedCar&&MODES[newMode].hasGFV?{gfv:selectedCar.gfv}:{}),
     };
+    const term=Number(base.term)||60;
     let rateOverride={};
     if(carModel && currentPromoId && promotions[currentPromoId]){
       const downPct=MODES[newMode].hasDeposit?(Number(base.depositPct)||25):(Number(base.downPct)||25);
-      const term=Number(base.term)||60;
       const financeAmt=calcWithBsi(newMode,base,discount).finance;
       const rateInfo=getRateForPromotion(newMode,carModel,downPct,term,promotions[currentPromoId],financeAmt);
       if(rateInfo){
@@ -2175,20 +2464,32 @@ export default function App(){
         setAutoFilledRate(null);
       }
     }
+    // เติมเพดาน Balloon % ตามกลุ่มรถ ในจังหวะเดียวกับ reset inputs ไม่ใช่รอ effect มาตามทีหลัง (บั๊ก switchMode เดิม)
+    if((newMode==='HP-BL'||newMode==='FL-BL') && selectedCar?.balloonGroup && currentPromoId && promotions[currentPromoId]){
+      const capEntry=getBalloonCapEntry(selectedCar.balloonGroup,term,promotions[currentPromoId]);
+      if(capEntry && capEntry.max!=null) rateOverride={...rateOverride,balloonPct:capEntry.max};
+    }
     setInputs({...base,...rateOverride});
   };
   
   const handleCarSelect=car=>{
     setSelectedCar(car); setCarModel(car.model); setSelectedBSI(car.bsiStd);
     setInputs(prev=>{
-      const newInputs={...prev,carPrice:car.bsiStd,...(MODES[mode].hasGFV&&car.gfv?{gfv:car.gfv}:{})};
-      
-      // Auto-fill rate
+      let newInputs={...prev,carPrice:car.bsiStd,...(MODES[mode].hasGFV&&car.gfv?{gfv:car.gfv}:{})};
+
       const downPct=MODES[mode].hasDeposit ? (Number(prev.depositPct) || 25) : (Number(prev.downPct) || 25);
       const term=Number(prev.term)||60;
+
+      // เติมเพดาน Balloon % ตามกลุ่มของรถที่เพิ่งเลือก ในจังหวะเดียวกับ reset inputs
+      if((mode==='HP-BL'||mode==='FL-BL') && car.balloonGroup && currentPromoId && promotions[currentPromoId]){
+        const capEntry=getBalloonCapEntry(car.balloonGroup,term,promotions[currentPromoId]);
+        if(capEntry && capEntry.max!=null) newInputs={...newInputs,balloonPct:capEntry.max};
+      }
+
+      // Auto-fill rate
       const financeAmt=calcWithBsi(mode,newInputs,discount).finance;
       setTimeout(()=>autoFillRate(mode,car.model,downPct,term,financeAmt),0);
-      
+
       return newInputs;
     });
   };
@@ -2405,7 +2706,7 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                   <div><div className="text-[10px] text-neutral-400">ยอดจัด</div><div className="text-sm font-semibold tabular-nums">{fmtB(result.finance)}</div></div>
                   <div><div className="text-[10px] text-neutral-400">ดาวน์</div><div className="text-sm font-semibold tabular-nums">{fmtB(m.hasDeposit?result.depositAmt:result.downAmt)}</div></div>
                 </div>
-                {(autoFilledRate?.exceededMaxFinance||result.term>60)&&(
+                {(autoFilledRate?.exceededMaxFinance||result.term>60||balloonWarning)&&(
                   <div className="mt-3 space-y-2">
                     {autoFilledRate?.exceededMaxFinance&&(
                       <div className="rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
@@ -2415,6 +2716,26 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
                     {result.term>60&&(
                       <div className="rounded-lg border border-orange-400/40 bg-orange-500/15 px-3 py-2 text-xs text-orange-200">
                         ⚠️ {result.term} งวด เกินเงื่อนไข BMW Leasing (สูงสุด 60 งวด) — ต้องใช้ไฟแนนซ์นอก เรทคนละชุด
+                      </div>
+                    )}
+                    {balloonWarning?.over!=null&&(
+                      <div className="rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
+                        ⚠️ Balloon {fmtB(inputs.balloonPct)}% เกินเพดานกลุ่ม {selectedCar?.balloonGroup} ({fmtB(balloonWarning.over)}%)
+                      </div>
+                    )}
+                    {balloonWarning?.under!=null&&(
+                      <div className="rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs text-red-200">
+                        ⚠️ Balloon {fmtB(inputs.balloonPct)}% ต่ำกว่าขั้นต่ำกลุ่ม {selectedCar?.balloonGroup} ({fmtB(balloonWarning.under)}%)
+                      </div>
+                    )}
+                    {balloonWarning?.noGroup&&(
+                      <div className="rounded-lg border border-orange-400/40 bg-orange-500/15 px-3 py-2 text-xs text-orange-200">
+                        ⚠️ รถคันนี้ยังไม่ระบุกลุ่มบอลลูน — ตั้งค่าได้ที่ Settings › ติดป้ายกลุ่มบอลลูน
+                      </div>
+                    )}
+                    {balloonWarning?.noTableData&&(
+                      <div className="rounded-lg border border-orange-400/40 bg-orange-500/15 px-3 py-2 text-xs text-orange-200">
+                        ⚠️ ไม่มีข้อมูลอัตราบอลลูนของกลุ่ม {balloonWarning.group} ในตารางโปรโมชั่นนี้
                       </div>
                     )}
                   </div>
@@ -2788,13 +3109,15 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
       )}
       
       {/* CAR MANAGER */}
-      {showCarManager&&<CarManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowCarManager(false);setShowSettings(false);}} onBack={()=>setShowCarManager(false)}/>}
+      {showCarManager&&<CarManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowCarManager(false);setShowSettings(false);}} onBack={()=>setShowCarManager(false)} balloonGroups={promotions[currentPromoId]?.balloonGroups||DEFAULT_BALLOON_GROUPS}/>}
+
+      {showBalloonGroupManager&&<BalloonGroupManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowBalloonGroupManager(false);setShowSettings(false);}} onBack={()=>setShowBalloonGroupManager(false)} balloonGroups={promotions[currentPromoId]?.balloonGroups||DEFAULT_BALLOON_GROUPS}/>}
       
       {/* SETTINGS - ซ่อนเมื่อ Manager เปิด */}
-      {showSettings&&!showCarManager&&!showPromoManager&&!showFreebieManager&&<SettingsDialog salesName={salesName} onSave={saveSalesName} onClose={()=>setShowSettings(false)} onOpenCarManager={()=>setShowCarManager(true)} onOpenPromoManager={()=>setShowPromoManager(true)} onOpenFreebieManager={()=>setShowFreebieManager(true)} onExport={exportAllData} onImport={importAllData}/>}
+      {showSettings&&!showCarManager&&!showBalloonGroupManager&&!showPromoManager&&!showFreebieManager&&<SettingsDialog salesName={salesName} onSave={saveSalesName} onClose={()=>setShowSettings(false)} onOpenCarManager={()=>setShowCarManager(true)} onOpenBalloonGroupManager={()=>setShowBalloonGroupManager(true)} onOpenPromoManager={()=>setShowPromoManager(true)} onOpenFreebieManager={()=>setShowFreebieManager(true)} onExport={exportAllData} onImport={importAllData}/>}
       
       {/* PROMOTION MANAGER */}
-      {showPromoManager&&<PromotionManager currentPromoId={currentPromoId} promotions={promotions} onSave={savePromotions} onClose={()=>{setShowPromoManager(false);setShowSettings(false);}} onBack={()=>setShowPromoManager(false)}/>}
+      {showPromoManager&&<PromotionManager currentPromoId={currentPromoId} promotions={promotions} onSave={savePromotions} onClose={()=>{setShowPromoManager(false);setShowSettings(false);}} onBack={()=>setShowPromoManager(false)} carDB={carDB} onUpdateCarBalloonGroups={updateCarBalloonGroups}/>}
       
       {/* FREEBIE MANAGER */}
       {showFreebieManager&&<FreebieManager items={freebieItems} onSave={saveFreebies} onClose={()=>{setShowFreebieManager(false);setShowSettings(false);}} onBack={()=>setShowFreebieManager(false)}/>}
