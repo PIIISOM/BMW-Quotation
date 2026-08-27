@@ -1955,15 +1955,19 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
   const key=modeInfo.hasDeposit?'depositPct':'downPct';
   const data=DOWN_PCTS.map(pct=>{
     let rateInputs={...inputs,[key]:pct,term:selectedTerm};
+    let exceededMaxFinance=null;
     if(currentPromoData&&carModel){
-      const rateInfo=getRateForPromotion(mode,carModel,pct,selectedTerm,currentPromoData);
+      // ยอดจัด (finance) ไม่ขึ้นกับอัตราดอกเบี้ย เลยคำนวณรอบแรกด้วย rateInputs เดิมเพื่อเอายอดจัดมาเช็คเพดานได้เลย
+      const financeAmt=calcWithBsi(mode,rateInputs,discount||0).finance;
+      const rateInfo=getRateForPromotion(mode,carModel,pct,selectedTerm,currentPromoData,financeAmt);
       if(rateInfo){
         if(mode==="HP") rateInputs={...rateInputs,sfFlatRate:rateInfo.rate};
         else rateInputs={...rateInputs,sfEffRate:rateInfo.rate};
       }
+      if(rateInfo?.exceededMaxFinance) exceededMaxFinance=rateInfo.exceededMaxFinance;
     }
     const r=calcWithBsi(mode,rateInputs,discount||0);
-    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:r.custFlatRate};
+    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:r.custFlatRate,exceededMaxFinance};
   });
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
@@ -2034,9 +2038,14 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
               </tr>
             </thead>
             <tbody>
-              {data.map(({pct,downAmt,monthly,rate},idx)=>(
+              {data.map(({pct,downAmt,monthly,rate,exceededMaxFinance},idx)=>(
                 <tr key={pct} className={idx%2===0?'bg-white':'bg-neutral-50'}>
-                  <td className="px-3 py-3 font-semibold text-neutral-700">{pct}%</td>
+                  <td className="px-3 py-3 font-semibold text-neutral-700">
+                    {pct}%
+                    {exceededMaxFinance&&(
+                      <span className="ml-1 text-amber-500 text-xs align-top cursor-help" title={`ยอดจัดเกินเพดานอัตราพิเศษ ${fmtB(exceededMaxFinance.maxFinance)} — ใช้อัตราพื้นฐานแทน`}>⚠️</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-right text-neutral-600 tabular-nums">{fmtB(downAmt)}</td>
                   {showRate&&<td className="px-3 py-3 text-right text-neutral-400 tabular-nums text-[11px]">{fmtP(rate)}</td>}
                   <td className="px-3 py-3 text-right font-bold text-[#1c69d4] tabular-nums">{fmtB(monthly)}</td>
