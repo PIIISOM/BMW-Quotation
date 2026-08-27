@@ -1,4 +1,5 @@
 import { calculate } from './financeEngine.js';
+import { clonePromotion } from './src/utils/promotionUtils.js';
 
 const CASES = [
   { n: 1, mode: 'HP', inputs: { carPrice: 3799000, downPct: 20, accessory: 0, bsi: 0, term: 84, sfFlatRate: 3.58, addInterest: 0 },
@@ -46,6 +47,38 @@ for (const { mode, base } of BSI_CASES) {
   const rB = calculate(mode, mergeBsi(inputB));
   const ok = Math.abs(rA.monthly - rB.monthly) < 0.005;
   console.log(`  ${ok ? '✅' : '❌'} ${mode.padEnd(6)} monthly A=${rA.monthly.toFixed(2).padStart(12)}  B=${rB.monthly.toFixed(2).padStart(12)}${ok ? '' : `  ต่าง ${(rA.monthly - rB.monthly).toFixed(2)}`}`);
+  ok ? pass++ : fail++;
+}
+
+// ── clonePromotion: deep clone สำหรับฟีเจอร์ "คัดลอกจากโปรโมชั่นอื่น" ──
+console.log(`\n${'─'.repeat(50)}\nclonePromotion`);
+const srcPromo = {
+  month: 'ต้นฉบับ',
+  importedAt: 1000,
+  terms: [48, 60],
+  balloonTable: { กลุ่มA: { 60: { max: 40, min: 20 } } },
+  HP: { default: [{ min: 20, max: 35, term: 60, rate: 3.5 }], special: [] },
+};
+
+{
+  const clone = clonePromotion(srcPromo, 9999);
+  clone.balloonTable['กลุ่มA'][60].max = 999;
+  const ok = srcPromo.balloonTable['กลุ่มA'][60].max === 40;
+  console.log(`  ${ok ? '✅' : '❌'} แก้ค่าลึกใน clone ไม่กระทบต้นฉบับ (ต้นฉบับ max=${srcPromo.balloonTable['กลุ่มA'][60].max})`);
+  ok ? pass++ : fail++;
+}
+{
+  const clone = clonePromotion(srcPromo, 9999);
+  const ok = clone.importedAt === 9999 && srcPromo.importedAt === 1000;
+  console.log(`  ${ok ? '✅' : '❌'} importedAt เป็นค่าใหม่ (clone=${clone.importedAt}, ต้นฉบับ=${srcPromo.importedAt})`);
+  ok ? pass++ : fail++;
+}
+{
+  const clone = clonePromotion(srcPromo, 9999);
+  const srcKeys = Object.keys(srcPromo).sort();
+  const cloneKeys = Object.keys(clone).sort();
+  const ok = srcKeys.length === cloneKeys.length && srcKeys.every((k, i) => k === cloneKeys[i]);
+  console.log(`  ${ok ? '✅' : '❌'} Object.keys ของ clone ครบเท่าต้นฉบับ (ต้นฉบับ ${srcKeys.length} key, clone ${cloneKeys.length} key)`);
   ok ? pass++ : fail++;
 }
 

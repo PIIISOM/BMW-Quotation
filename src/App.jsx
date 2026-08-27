@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Save, FolderOpen, Trash2, Settings, ChevronRight, Info, X, Check, ChevronDown, Search, Plus, Edit2, MessageSquare, RotateCcw, Download, Upload, Moon, Sun } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { clonePromotion } from "./utils/promotionUtils.js";
 
 // ============ FIREBASE SETUP ============
 const firebaseConfig = {
@@ -892,6 +893,9 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
   const[editingTier,setEditingTier]=useState(null);
   const[addingMonth,setAddingMonth]=useState(false);
   const[newMonthName,setNewMonthName]=useState("");
+  const[addingClone,setAddingClone]=useState(false);
+  const[cloneSrcId,setCloneSrcId]=useState("");
+  const[cloneNewName,setCloneNewName]=useState("");
   const MAX_MONTHS=6;
   const customTermRef=useRef(null);
 
@@ -1184,6 +1188,25 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
     setAddingMonth(false);setNewMonthName("");
   };
 
+  const cloneFromPromotion=()=>{
+    const name=cloneNewName.trim();
+    if(!name){alert("❌ กรุณาใส่ชื่อโปรโมชั่นใหม่");return;}
+    const nameExists=Object.values(promos).some(p=>(p.month||"").trim()===name);
+    if(nameExists){alert("❌ มีโปรโมชั่นชื่อนี้อยู่แล้ว");return;}
+    const srcPromo=promos[cloneSrcId];
+    if(!srcPromo){alert("❌ ไม่พบโปรโมชั่นต้นทาง");return;}
+    const id=`promo-${Date.now()}`;
+    const cloned=clonePromotion(srcPromo,Date.now());
+    setPromos(prev=>({
+      ...prev,
+      [id]:{
+        ...cloned,
+        month:name
+      }
+    }));
+    setAddingClone(false);setCloneNewName("");
+  };
+
   const deletePromo=(id)=>{
     if(Object.keys(promos).length<=1){alert("❌ ต้องมีโปรโมชั่นอย่างน้อย 1 รายการ");return;}
     if(!confirm(`ลบโปรโมชั่น "${promos[id]?.month||id}" ?\nข้อมูลจะหายถาวรหลังบันทึก`))return;
@@ -1248,6 +1271,27 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
               </button>
             ):(
               <p className="text-[11px] text-neutral-400 text-center">เต็ม {MAX_MONTHS} เดือนแล้ว — ลบเดือนเก่าก่อนเพิ่มใหม่</p>
+            )}
+            {addingClone?(
+              <div className="flex flex-col gap-2 bg-blue-50 border border-blue-200 rounded-lg p-2">
+                <select value={cloneSrcId} onChange={e=>setCloneSrcId(e.target.value)}
+                  className="rounded border border-neutral-200 px-2 py-1 text-xs bg-white focus:border-[#1c69d4] focus:outline-none">
+                  {Object.keys(promos).sort((a,b)=>(promos[b].importedAt||0)-(promos[a].importedAt||0)).map(id=>(<option key={id} value={id}>{promos[id].month||id}</option>))}
+                </select>
+                <div className="flex gap-2 items-center">
+                  <input type="text" value={cloneNewName} onChange={e=>setCloneNewName(e.target.value)}
+                    onKeyDown={e=>e.key==="Enter"&&cloneFromPromotion()}
+                    placeholder="ชื่อโปรโมชั่นใหม่" autoFocus
+                    className="flex-1 rounded border border-neutral-200 px-2 py-1 text-xs focus:border-[#1c69d4] focus:outline-none"/>
+                  <button onClick={cloneFromPromotion} className="rounded-lg bg-[#1c69d4] text-white px-3 py-1 text-xs font-semibold">คัดลอก</button>
+                  <button onClick={()=>{setAddingClone(false);setCloneNewName("");}} className="text-neutral-400 hover:text-neutral-600 text-xs">ยกเลิก</button>
+                </div>
+              </div>
+            ):Object.keys(promos).length<MAX_MONTHS&&(
+              <button onClick={()=>{setCloneSrcId(activePromo);setAddingClone(true);}}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-300 py-1.5 text-xs font-medium text-neutral-500 hover:border-[#1c69d4] hover:text-[#1c69d4] hover:bg-blue-50 transition-colors">
+                <Plus size={13}/>คัดลอกจากโปรโมชั่นอื่น
+              </button>
             )}
           </div>
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
