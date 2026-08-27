@@ -879,7 +879,7 @@ function FreebieManager({items,onSave,onClose,onBack}){
 }
 
 // ============ PROMOTION MANAGER ============
-function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB,onUpdateCarBalloonGroups}){
+function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB,onUpdateCarBalloonGroups,balloonGroups,onSaveBalloonGroups}){
   const[promos,setPromos]=useState(()=>{
     const migrated={};
     Object.keys(promotions).forEach(id=>{migrated[id]=migratePromotion(promotions[id]);});
@@ -898,7 +898,8 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
   const currentPromo=promos[activePromo]||{...DEFAULT_PROMOTION};
   const activeTerms=(currentPromo.terms||[48,60]).map(Number).sort((a,b)=>a-b);
   const AVAILABLE_TERMS=[48,60,72,84];
-  const balloonGroups=currentPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
+  // รายชื่อกลุ่มบอลลูนเป็น entity กลาง (มาจาก App ผ่าน prop) — balloonTable ยังอยู่รายเดือนเหมือนเดิม
+  const groupOptions=balloonGroups||DEFAULT_BALLOON_GROUPS;
 
   const updateBalloonCap=(group,term,field,value)=>{
     setPromos(prev=>{
@@ -928,30 +929,24 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
   const addBalloonGroup=()=>{
     const name=(prompt("ชื่อกลุ่มบอลลูนใหม่")||"").trim();
     if(!name)return;
-    setPromos(prev=>{
-      const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
-      const curGroups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
-      if(curGroups.includes(name)){alert("❌ มีกลุ่มนี้อยู่แล้ว");return prev;}
-      return{...prev,[activePromo]:{...curPromo,balloonGroups:[...curGroups,name]}};
-    });
+    if(groupOptions.includes(name)){alert("❌ มีกลุ่มนี้อยู่แล้ว");return;}
+    onSaveBalloonGroups?.([...groupOptions,name]);
   };
 
   const renameBalloonGroup=(oldName)=>{
     const newName=(prompt("เปลี่ยนชื่อกลุ่มบอลลูน",oldName)||"").trim();
     if(!newName||newName===oldName)return;
-    const curGroups=currentPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
-    if(curGroups.includes(newName)){alert("❌ มีกลุ่มชื่อนี้อยู่แล้ว");return;}
+    if(groupOptions.includes(newName)){alert("❌ มีกลุ่มชื่อนี้อยู่แล้ว");return;}
+    onSaveBalloonGroups?.(groupOptions.map(g=>g===oldName?newName:g));
+    // รีคีย์ balloonTable ของโปรโมชั่นที่กำลังแก้อยู่ (ตาราง balloonTable ยังผูกกับรายเดือนเหมือนเดิม)
     setPromos(prev=>{
       const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
-      const groups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
-      const newGroups=groups.map(g=>g===oldName?newName:g);
       const table=curPromo.balloonTable||{};
+      if(table[oldName]===undefined)return prev;
       const newTable={...table};
-      if(newTable[oldName]!==undefined){
-        newTable[newName]=newTable[oldName];
-        delete newTable[oldName];
-      }
-      return{...prev,[activePromo]:{...curPromo,balloonGroups:newGroups,balloonTable:newTable}};
+      newTable[newName]=newTable[oldName];
+      delete newTable[oldName];
+      return{...prev,[activePromo]:{...curPromo,balloonTable:newTable}};
     });
     onUpdateCarBalloonGroups?.(oldName,newName);
   };
@@ -962,14 +957,14 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
       ?`⚠️ มีรถ ${affectedCount} คันใช้กลุ่ม "${name}" อยู่\nถ้าลบ รถกลุ่มนี้จะกลายเป็น "ยังไม่ระบุกลุ่ม"\n\nต้องการลบกลุ่มนี้ต่อไปหรือไม่?`
       :`ต้องการลบกลุ่ม "${name}" ใช่ไหม?`;
     if(!confirm(msg))return;
+    onSaveBalloonGroups?.(groupOptions.filter(g=>g!==name));
     setPromos(prev=>{
       const curPromo=prev[activePromo]||{...DEFAULT_PROMOTION};
-      const groups=curPromo.balloonGroups||DEFAULT_BALLOON_GROUPS;
-      const newGroups=groups.filter(g=>g!==name);
       const table=curPromo.balloonTable||{};
+      if(table[name]===undefined)return prev;
       const newTable={...table};
       delete newTable[name];
-      return{...prev,[activePromo]:{...curPromo,balloonGroups:newGroups,balloonTable:newTable}};
+      return{...prev,[activePromo]:{...curPromo,balloonTable:newTable}};
     });
     if(affectedCount>0) onUpdateCarBalloonGroups?.(name,null);
   };
@@ -1305,7 +1300,7 @@ function PromotionManager({currentPromoId,promotions,onSave,onClose,onBack,carDB
                   </tr>
                 </thead>
                 <tbody>
-                  {balloonGroups.map(group=>(
+                  {groupOptions.map(group=>(
                     <tr key={group} className="border-t border-neutral-200">
                       <td className="py-1.5 px-2 font-semibold text-neutral-700 whitespace-nowrap">
                         <div className="flex items-center gap-1">
@@ -2061,6 +2056,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
 export default function App(){
   const[darkMode,setDarkMode]=useState(()=>localStorage.getItem("darkMode")==="true");
   const[carDB,setCarDB]=useState([]);
+  const[balloonGroups,setBalloonGroups]=useState([]); // [] = ยังไม่มีข้อมูลกลาง — fallback ที่จุดใช้งาน
   const[mode,setMode]=useState("HP");
   const[inputs,setInputs]=useState(DEFAULT_INPUTS.HP);
   const[carModel,setCarModel]=useState("");
@@ -2085,7 +2081,13 @@ export default function App(){
   const[currentPromoId,setCurrentPromoId]=useState("");
   const[promotions,setPromotions]=useState({});
   const[autoFilledRate,setAutoFilledRate]=useState(null);
-  
+
+  // รายชื่อกลุ่มบอลลูน — กลาง (balloonGroups) ก่อน ถ้าไม่มีค่อย fallback ไปของโปรโมชั่นที่ active แล้วค่อย DEFAULT
+  // ไม่มี migration script: ชื่อกลุ่มที่เคยแก้ไว้ในโปรโมชั่นเดิมจะยังโผล่มาจาก fallback นี้จนกว่าจะมีการเขียนกลางครั้งแรก
+  const resolvedBalloonGroups = balloonGroups.length>0
+    ? balloonGroups
+    : (promotions[currentPromoId]?.balloonGroups || DEFAULT_BALLOON_GROUPS);
+
   // Freebies State
   const[freebieItems,setFreebieItems]=useState([]);
   const[selectedFreebies,setSelectedFreebies]=useState([]);
@@ -2160,17 +2162,25 @@ export default function App(){
             setFreebieItems(DEFAULT_FREEBIES);
           }
 
+          // balloonGroups (กลาง) — ไม่มี = ปล่อยว่างไว้ ให้ resolvedBalloonGroups fallback เอง
+          if(data.balloonGroups && Array.isArray(data.balloonGroups) && data.balloonGroups.length > 0){
+            setBalloonGroups(data.balloonGroups);
+            localStorage.setItem("balloonGroups", JSON.stringify(data.balloonGroups));
+          }
+
         } else {
           // Firebase ว่าง → ใช้ข้อมูล local หรือ default แล้ว upload ขึ้น
           const localCarDB = JSON.parse(localStorage.getItem("carDB")||"null");
           const localPromos = JSON.parse(localStorage.getItem("promotions")||"null");
           const localFreebies = JSON.parse(localStorage.getItem("freebieItems")||"null");
+          const localBalloonGroups = JSON.parse(localStorage.getItem("balloonGroups")||"null");
 
           const carDBToUse = (localCarDB && localCarDB.length > 0) ? localCarDB : DEFAULT_CAR_DB;
           const freebiestoUse = (localFreebies && localFreebies.length > 0) ? localFreebies : DEFAULT_FREEBIES;
 
           setCarDB(carDBToUse);
           setFreebieItems(freebiestoUse);
+          if(localBalloonGroups && localBalloonGroups.length > 0) setBalloonGroups(localBalloonGroups);
 
           if(localPromos && localPromos.promotions){
             setPromotions(localPromos.promotions);
@@ -2183,6 +2193,7 @@ export default function App(){
           saveToCloud("carDB", carDBToUse);
           saveToCloud("freebieItems", freebiestoUse);
           if(localPromos) saveToCloud("promotions", localPromos);
+          if(localBalloonGroups && localBalloonGroups.length > 0) saveToCloud("balloonGroups", localBalloonGroups);
         }
       } catch(err){
         console.error("Firebase sync error:", err);
@@ -2198,6 +2209,8 @@ export default function App(){
           const savedFreebies=localStorage.getItem("freebieItems");
           if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); }
           else setFreebieItems(DEFAULT_FREEBIES);
+          const savedBalloonGroups=localStorage.getItem("balloonGroups");
+          if(savedBalloonGroups){ const g=JSON.parse(savedBalloonGroups); if(g?.length>0) setBalloonGroups(g); }
         } catch { setDataSource('default'); setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
       }
     }, (err) => {
@@ -2214,6 +2227,8 @@ export default function App(){
         if(savedPromos){ const p=JSON.parse(savedPromos); if(p?.promotions){ setPromotions(p.promotions); setCurrentPromoId(p.currentPromo||""); } else initializeDefaultPromotion(); } else initializeDefaultPromotion();
         const savedFreebies=localStorage.getItem("freebieItems");
         if(savedFreebies){ const p=JSON.parse(savedFreebies); if(p?.length>0) setFreebieItems(p); else setFreebieItems(DEFAULT_FREEBIES); } else setFreebieItems(DEFAULT_FREEBIES);
+        const savedBalloonGroups=localStorage.getItem("balloonGroups");
+        if(savedBalloonGroups){ const g=JSON.parse(savedBalloonGroups); if(g?.length>0) setBalloonGroups(g); }
       } catch { setDataSource('default'); setCarDB(DEFAULT_CAR_DB); setFreebieItems(DEFAULT_FREEBIES); initializeDefaultPromotion(); }
     });
 
@@ -2258,6 +2273,17 @@ export default function App(){
     saveCarDB(updated);
   };
 
+  // บันทึกรายชื่อกลุ่มบอลลูนกลาง (entity เดียวกับ carDB/freebieItems)
+  const saveBalloonGroups=groups=>{
+    try{
+      localStorage.setItem("balloonGroups",JSON.stringify(groups));
+      setBalloonGroups(groups);
+      saveToCloud("balloonGroups", groups);
+      showToast("บันทึกกลุ่มบอลลูนแล้ว ✓");
+    }
+    catch{ showToast("บันทึกไม่สำเร็จ"); }
+  };
+
   const saveSalesName=name=>{
     try{ localStorage.setItem("salesName",name); setSalesName(name); showToast("บันทึกชื่อแล้ว ✓"); }
     catch{ showToast("บันทึกไม่สำเร็จ"); }
@@ -2294,7 +2320,8 @@ export default function App(){
         carDB,
         promotions:{currentPromo:currentPromoId,promotions},
         salesName,
-        freebieItems
+        freebieItems,
+        balloonGroups
       };
       
       const json=JSON.stringify(data,null,2);
@@ -2339,15 +2366,18 @@ export default function App(){
         setCurrentPromoId(data.promotions.currentPromo);
         setSalesName(data.salesName||"");
         setFreebieItems(data.freebieItems||DEFAULT_FREEBIES);
-        
+        setBalloonGroups(data.balloonGroups||[]);
+
         localStorage.setItem("carDB",JSON.stringify(data.carDB));
         localStorage.setItem("promotions",JSON.stringify(data.promotions));
         localStorage.setItem("salesName",data.salesName||"");
         localStorage.setItem("freebieItems",JSON.stringify(data.freebieItems||DEFAULT_FREEBIES));
+        localStorage.setItem("balloonGroups",JSON.stringify(data.balloonGroups||[]));
 
         saveToCloud("carDB", data.carDB);
         saveToCloud("promotions", data.promotions);
         saveToCloud("freebieItems", data.freebieItems||DEFAULT_FREEBIES);
+        if(data.balloonGroups&&data.balloonGroups.length>0) saveToCloud("balloonGroups", data.balloonGroups);
 
         showToast("นำเข้าข้อมูลสำเร็จ ✓");
       }catch(err){
@@ -3108,15 +3138,15 @@ ${m.hasBalloon?`• Balloon: ${fmtB(result.balloonAmt)} (${fmtP(result.balloonPc
       )}
       
       {/* CAR MANAGER */}
-      {showCarManager&&<CarManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowCarManager(false);setShowSettings(false);}} onBack={()=>setShowCarManager(false)} balloonGroups={promotions[currentPromoId]?.balloonGroups||DEFAULT_BALLOON_GROUPS}/>}
+      {showCarManager&&<CarManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowCarManager(false);setShowSettings(false);}} onBack={()=>setShowCarManager(false)} balloonGroups={resolvedBalloonGroups}/>}
 
-      {showBalloonGroupManager&&<BalloonGroupManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowBalloonGroupManager(false);setShowSettings(false);}} onBack={()=>setShowBalloonGroupManager(false)} balloonGroups={promotions[currentPromoId]?.balloonGroups||DEFAULT_BALLOON_GROUPS}/>}
+      {showBalloonGroupManager&&<BalloonGroupManager carDB={carDB} onSave={saveCarDB} onClose={()=>{setShowBalloonGroupManager(false);setShowSettings(false);}} onBack={()=>setShowBalloonGroupManager(false)} balloonGroups={resolvedBalloonGroups}/>}
       
       {/* SETTINGS - ซ่อนเมื่อ Manager เปิด */}
       {showSettings&&!showCarManager&&!showBalloonGroupManager&&!showPromoManager&&!showFreebieManager&&<SettingsDialog salesName={salesName} onSave={saveSalesName} onClose={()=>setShowSettings(false)} onOpenCarManager={()=>setShowCarManager(true)} onOpenBalloonGroupManager={()=>setShowBalloonGroupManager(true)} onOpenPromoManager={()=>setShowPromoManager(true)} onOpenFreebieManager={()=>setShowFreebieManager(true)} onExport={exportAllData} onImport={importAllData}/>}
       
       {/* PROMOTION MANAGER */}
-      {showPromoManager&&<PromotionManager currentPromoId={currentPromoId} promotions={promotions} onSave={savePromotions} onClose={()=>{setShowPromoManager(false);setShowSettings(false);}} onBack={()=>setShowPromoManager(false)} carDB={carDB} onUpdateCarBalloonGroups={updateCarBalloonGroups}/>}
+      {showPromoManager&&<PromotionManager currentPromoId={currentPromoId} promotions={promotions} onSave={savePromotions} onClose={()=>{setShowPromoManager(false);setShowSettings(false);}} onBack={()=>setShowPromoManager(false)} carDB={carDB} onUpdateCarBalloonGroups={updateCarBalloonGroups} balloonGroups={resolvedBalloonGroups} onSaveBalloonGroups={saveBalloonGroups}/>}
       
       {/* FREEBIE MANAGER */}
       {showFreebieManager&&<FreebieManager items={freebieItems} onSave={saveFreebies} onClose={()=>{setShowFreebieManager(false);setShowSettings(false);}} onBack={()=>setShowFreebieManager(false)}/>}
