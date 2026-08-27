@@ -1967,8 +1967,10 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
       if(rateInfo?.exceededMaxFinance) exceededMaxFinance=rateInfo.exceededMaxFinance;
     }
     const r=calcWithBsi(mode,rateInputs,discount||0);
-    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:r.custFlatRate,exceededMaxFinance};
+    return{pct,downAmt:modeInfo.hasDeposit?r.depositAmt:r.downAmt,monthly:r.monthly,rate:mode==="HP"?r.custFlatRate:r.realSfRate,exceededMaxFinance};
   });
+  // balloonPct/balloonAmt ไม่ขึ้นกับ downPct หรือ term ที่ต่างกันในแต่ละแถว — คำนวณครั้งเดียวพอสำหรับ Hero Card
+  const heroResult=modeInfo.hasBalloon?calcWithBsi(mode,{...inputs,term:selectedTerm},discount||0):null;
   return(
     <div className="fixed inset-0 z-50 bg-neutral-50 overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3">
@@ -1992,7 +1994,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
             <div className="text-[15px] font-bold text-white leading-snug mb-4">
               {carModel ? carModel.split(' - ').slice(1).join(' - ') : '-'}
             </div>
-            <div className={`grid gap-3 border-t border-white/10 pt-3 ${(Number(discount)||0)>0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
               <div>
                 <div className="text-[10px] text-neutral-400">ราคารถ</div>
                 <div className="text-sm font-semibold tabular-nums">{fmtB(Number(inputs.carPrice)||0)}</div>
@@ -2007,6 +2009,16 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
                 <div className="text-[10px] text-neutral-400">ราคาสุทธิ</div>
                 <div className="text-sm font-semibold tabular-nums">{fmtB((Number(inputs.carPrice)||0)-(Number(discount)||0))}</div>
               </div>
+              <div>
+                <div className="text-[10px] text-neutral-400">ระยะเวลาผ่อน</div>
+                <div className="text-sm font-semibold tabular-nums">{selectedTerm} งวด</div>
+              </div>
+              {modeInfo.hasBalloon&&heroResult&&(
+                <div>
+                  <div className="text-[10px] text-neutral-400">ยอดบอลลูน</div>
+                  <div className="text-sm font-semibold tabular-nums">{fmtP(heroResult.balloonPct)} ({fmtB(heroResult.balloonAmt)})</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2028,7 +2040,7 @@ function DownTableScreen({carModel,mode,inputs,discount,promotionTerms,currentPr
               <tr className="border-b border-neutral-100 bg-neutral-50">
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-500">ดาวน์</th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">เงินดาวน์ (บาท)</th>
-                {showRate&&<th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">ดอกเบี้ย</th>}
+                {showRate&&<th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">{mode==="HP"?"ดอกเบี้ย (Flat)":"ดอกเบี้ย (Eff.)"}</th>}
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-500">
                   <span className="flex items-center justify-end gap-2">
                     ยอดผ่อน/เดือน
